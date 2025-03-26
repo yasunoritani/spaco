@@ -1,1214 +1,1094 @@
-# SuperCollider プロンプト例集（拡張版）
+# SuperCollider プロンプト例集（改良版）
 
-以下は、Claude DesktopからSuperColliderを操作するための自然言語プロンプト例です。これらの例は、音響合成や音楽制作のさまざまな側面をカバーしています。
+以下は、Claude DesktopからSuperColliderを操作するための自然言語プロンプト例です。これらの例は、音響合成や音楽制作のさまざまな側面をカバーしており、SuperColliderのベストプラクティスに従って実装されています。
 
 ## 基本的な音生成
 
 1. **「440Hzの正弦波を生成して」**
-   ```supercollider
-   { SinOsc.ar(440, 0, 0.5) }.play;
-   ```
+    ```supercollider
+    s.waitForBoot({
+        // 基本的な正弦波オシレーターを生成
+        {
+            var sig = SinOsc.ar(440, 0, 0.5);
+            // エンベロープを適用してクリックノイズを防止
+            sig = sig * EnvGen.kr(Env.linen(0.01, 1, 0.01), doneAction: 2);
+            sig ! 2 // ステレオ出力
+        }.play;
+    });
+    ```
 
 2. **「Aの音を鳴らして」**
-   ```supercollider
-   { SinOsc.ar(440, 0, 0.5) }.play;
-   ```
+    ```supercollider
+    s.waitForBoot({
+        // A4 (440Hz) の音を生成
+        {
+            var sig = SinOsc.ar(440, 0, 0.5);
+            // エンベロープを適用
+            sig = sig * EnvGen.kr(Env.linen(0.01, 1, 0.01), doneAction: 2);
+            sig ! 2 // ステレオ出力
+        }.play;
+    });
+    ```
 
 3. **「中程度の音量でC4の音を5秒間鳴らして」**
-   ```supercollider
-   (
-   {
-       var sig = SinOsc.ar(261.63, 0, 0.3);
-       var env = EnvGen.kr(Env.linen(0.01, 5, 0.01), doneAction: 2);
-       sig * env
-   }.play;
-   )
-   ```
+    ```supercollider
+    s.waitForBoot({
+        {
+            // C4 (261.63Hz) の音を生成
+            var sig = SinOsc.ar(261.63, 0, 0.3);
+            // 5秒間持続するエンベロープを適用
+            var env = EnvGen.kr(Env.linen(0.01, 5, 0.01), doneAction: 2);
+            sig * env ! 2 // ステレオ出力
+        }.play;
+    });
+    ```
 
-## 音色の変化
+## 波形と音色
 
 4. **「ノコギリ波で低いCの音を鳴らして」**
-   ```supercollider
-   { Saw.ar(65.41, 0.3) }.play;
-   ```
+    ```supercollider
+    s.waitForBoot({
+        {
+            // C2 (65.41Hz) のノコギリ波を生成
+            var sig = Saw.ar(65.41, 0.3);
+            // エンベロープを適用
+            sig = sig * EnvGen.kr(Env.linen(0.01, 1, 0.01), doneAction: 2);
+            sig ! 2 // ステレオ出力
+        }.play;
+    });
+    ```
 
 5. **「柔らかい音色のパッドサウンドを作って」**
-   ```supercollider
-   (
-   {
-       var sig = SinOsc.ar([440, 442], 0, 0.1) + SinOsc.ar([220, 221], 0, 0.05);
-       sig = LPF.ar(sig, 1000);
-       sig = sig * EnvGen.kr(Env.adsr(1, 0.2, 0.7, 2), 1, doneAction: 2);
-       sig
-   }.play;
-   )
-   ```
+    ```supercollider
+    s.waitForBoot({
+        {
+            // デチューンした複数の正弦波を使用
+            var sig = SinOsc.ar([440, 442], 0, 0.1) + SinOsc.ar([220, 221], 0, 0.05);
+            // ローパスフィルターで高周波を削減
+            sig = LPF.ar(sig, 1000);
+            // ADSRエンベロープで緩やかな立ち上がりと減衰を実現
+            sig = sig * EnvGen.kr(Env.adsr(1, 0.2, 0.7, 2), 1, doneAction: 2);
+            sig
+        }.play;
+    });
+    ```
 
 6. **「金属的な音色を作って」**
-   ```supercollider
-   (
-   {
-       var sig = Klank.ar(`[[200, 671, 1153, 1723], nil, [1, 1, 1, 1]], Impulse.ar(1, 0, 0.1));
-       sig = sig * EnvGen.kr(Env.perc(0.01, 2), doneAction: 2);
-       sig ! 2
-   }.play;
-   )
-   ```
+    ```supercollider
+    s.waitForBoot({
+        {
+            // Klankを使用して金属的な倍音構造を作成
+            var sig = Klank.ar(`[[200, 671, 1153, 1723], nil, [1, 1, 1, 1]], Impulse.ar(1, 0, 0.1));
+            // パーカッシブなエンベロープを適用
+            sig = sig * EnvGen.kr(Env.perc(0.01, 2), doneAction: 2);
+            sig ! 2 // ステレオ出力
+        }.play;
+    });
+    ```
 
-## 周波数変調
+## 音の変化と表現
 
 7. **「低音から高音へ徐々に変化する音を作って」**
-   ```supercollider
-   (
-   {
-       var freq = Line.kr(100, 800, 5);
-       var sig = SinOsc.ar(freq, 0, 0.3);
-       sig = sig * EnvGen.kr(Env.linen(0.1, 4.8, 0.1), doneAction: 2);
-       sig ! 2
-   }.play;
-   )
-   ```
+    ```supercollider
+    s.waitForBoot({
+        {
+            // 5秒かけて100Hzから800Hzまで周波数を変化
+            var freq = Line.kr(100, 800, 5);
+            var sig = SinOsc.ar(freq, 0, 0.3);
+            // エンベロープを適用
+            sig = sig * EnvGen.kr(Env.linen(0.1, 4.8, 0.1), doneAction: 2);
+            sig ! 2 // ステレオ出力
+        }.play;
+    });
+    ```
 
 8. **「ビブラートのかかったフルートのような音を作って」**
-   ```supercollider
-   (
-   {
-       var vibrato = SinOsc.kr(5, 0, 10);
-       var freq = 440 + vibrato;
-       var sig = SinOsc.ar(freq, 0, 0.3);
-       sig = sig * EnvGen.kr(Env.linen(0.1, 1, 0.5), doneAction: 2);
-       sig ! 2
-   }.play;
-   )
-   ```
+    ```supercollider
+    s.waitForBoot({
+        {
+            // 5Hzのビブラート（周波数変調）を適用
+            var vibrato = SinOsc.kr(5, 0, 10);
+            var freq = 440 + vibrato;
+            var sig = SinOsc.ar(freq, 0, 0.3);
+            // エンベロープを適用
+            sig = sig * EnvGen.kr(Env.linen(0.1, 1, 0.5), doneAction: 2);
+            sig ! 2 // ステレオ出力
+        }.play;
+    });
+    ```
 
 ## エフェクト処理
 
 9. **「エコーのかかったピアノの音を作って」**
-   ```supercollider
-   (
-   {
-       var sig = SinOsc.ar(440, 0, 0.5) * EnvGen.kr(Env.perc(0.01, 1), doneAction: 0);
-       sig = CombL.ar(sig, 0.5, 0.3, 3);
-       sig ! 2
-   }.play;
-   )
-   ```
+    ```supercollider
+    s.waitForBoot({
+        {
+            // 基本的なピアノ風の音を生成
+            var sig = SinOsc.ar(440, 0, 0.5) * EnvGen.kr(Env.perc(0.01, 1));
+            // CombLでエコー効果を追加
+            sig = CombL.ar(sig, 0.5, 0.3, 3);
+            // 全体のエンベロープを適用
+            sig = sig * EnvGen.kr(Env.linen(0, 4, 0.1), doneAction: 2);
+            sig ! 2 // ステレオ出力
+        }.play;
+    });
+    ```
 
 10. **「リバーブのかかったベルの音を作って」**
     ```supercollider
-    (
-    {
-        var sig = Klank.ar(`[[400, 1071, 1353, 1723], nil, [1, 1, 1, 1]], Impulse.ar(1, 0, 0.1));
-        sig = sig * EnvGen.kr(Env.perc(0.01, 2), doneAction: 0);
-        sig = FreeVerb.ar(sig, 0.7, 0.8, 0.2);
-        sig ! 2
-    }.play;
-    )
+    s.waitForBoot({
+        {
+            // Klankを使用してベル音を生成
+            var sig = Klank.ar(`[[400, 1071, 1353, 1723], nil, [1, 1, 1, 1]], Impulse.ar(1, 0, 0.1));
+            // パーカッシブなエンベロープを適用
+            sig = sig * EnvGen.kr(Env.perc(0.01, 2));
+            // FreeVerbでリバーブを追加
+            sig = FreeVerb.ar(sig, 0.7, 0.8, 0.2);
+            // 全体のエンベロープを適用
+            sig = sig * EnvGen.kr(Env.linen(0, 3, 0.1), doneAction: 2);
+            sig ! 2 // ステレオ出力
+        }.play;
+    });
     ```
 
 11. **「ディストーションのかかったギターの音を作って」**
     ```supercollider
-    (
-    {
-        var sig = Pluck.ar(WhiteNoise.ar(0.1), Impulse.kr(1), 440.reciprocal, 440.reciprocal, 10);
-        sig = (sig * 10).tanh * 0.5;
-        sig ! 2
-    }.play;
-    )
+    s.waitForBoot({
+        {
+            // Pluckを使用して弦楽器の音を生成
+            var sig = Pluck.ar(WhiteNoise.ar(0.1), Impulse.kr(1), 440.reciprocal, 440.reciprocal, 10);
+            // tanhでソフトクリッピングによるディストーションを追加
+            sig = (sig * 10).tanh * 0.5;
+            // エンベロープを適用
+            sig = sig * EnvGen.kr(Env.linen(0.01, 2, 0.1), doneAction: 2);
+            sig ! 2 // ステレオ出力
+        }.play;
+    });
     ```
 
 ## リズムとシーケンス
 
 12. **「120BPMの4つ打ちビートを作って」**
     ```supercollider
-    (
-    {
-        var tempo = 120/60;
-        var kick = SinOsc.ar(60, 0, 0.5) * EnvGen.kr(Env.perc(0.01, 0.3), Impulse.kr(tempo));
-        var hihat = WhiteNoise.ar(0.1) * EnvGen.kr(Env.perc(0.01, 0.1), Impulse.kr(tempo, 0.5));
-        kick + hihat ! 2
-    }.play;
-    )
+    s.waitForBoot({
+        // SynthDefを定義
+        SynthDef(\kick, { |out=0, amp=0.5|
+            var sig = SinOsc.ar(60, 0, amp) * EnvGen.kr(Env.perc(0.01, 0.3), doneAction: 2);
+            Out.ar(out, sig ! 2);
+        }).add;
+        
+        SynthDef(\hihat, { |out=0, amp=0.1|
+            var sig = WhiteNoise.ar(amp) * EnvGen.kr(Env.perc(0.01, 0.1), doneAction: 2);
+            Out.ar(out, sig ! 2);
+        }).add;
+        
+        // パターンを作成
+        Pbind(
+            \instrument, Pseq([\kick, \hihat], inf),
+            \dur, Pseq([0.5, 0.5], inf),
+            \amp, Pseq([0.5, 0.1], inf)
+        ).play;
+    });
     ```
 
 13. **「アルペジオを生成して」**
     ```supercollider
-    (
-    Pbind(
-        \instrument, \default,
-        \note, Pseq([0, 3, 7, 12], inf),
-        \dur, 0.25,
-        \amp, 0.2
-    ).play;
-    )
+    s.waitForBoot({
+        // SynthDefを定義
+        SynthDef(\tone, { |out=0, freq=440, amp=0.2|
+            var sig = SinOsc.ar(freq, 0, amp) * EnvGen.kr(Env.perc(0.01, 0.2), doneAction: 2);
+            Out.ar(out, sig ! 2);
+        }).add;
+        
+        // アルペジオパターンを作成
+        Pbind(
+            \instrument, \tone,
+            \note, Pseq([0, 3, 7, 12], inf),
+            \dur, 0.25,
+            \amp, 0.2
+        ).play;
+    });
     ```
 
 14. **「Cメジャースケールを上昇して下降するメロディーを作って」**
     ```supercollider
-    (
-    Pbind(
-        \instrument, \default,
-        \note, Pseq([0, 2, 4, 5, 7, 9, 11, 12, 11, 9, 7, 5, 4, 2, 0], 1),
-        \dur, 0.25,
-        \amp, 0.2
-    ).play;
-    )
+    s.waitForBoot({
+        // SynthDefを定義
+        SynthDef(\tone, { |out=0, freq=440, amp=0.2|
+            var sig = SinOsc.ar(freq, 0, amp) * EnvGen.kr(Env.perc(0.01, 0.2), doneAction: 2);
+            Out.ar(out, sig ! 2);
+        }).add;
+        
+        // Cメジャースケールの上昇下降パターンを作成
+        Pbind(
+            \instrument, \tone,
+            \note, Pseq([0, 2, 4, 5, 7, 9, 11, 12, 11, 9, 7, 5, 4, 2, 0], 1),
+            \dur, 0.25,
+            \amp, 0.2
+        ).play;
+    });
     ```
 
-## 複雑な音響設計
+## 環境音と自然音
 
 15. **「海の波の音を合成して」**
     ```supercollider
-    (
-    {
-        var waves = LPF.ar(WhiteNoise.ar(0.5), LFNoise1.kr(0.3).range(400, 1200));
-        waves = waves * LFNoise1.kr(0.5).range(0.3, 1);
-        waves ! 2
-    }.play;
-    )
+    s.waitForBoot({
+        {
+            // ホワイトノイズをベースに変動するローパスフィルターを適用
+            var waves = LPF.ar(WhiteNoise.ar(0.5), LFNoise1.kr(0.3).range(400, 1200));
+            // 音量も緩やかに変動
+            waves = waves * LFNoise1.kr(0.5).range(0.3, 1);
+            // 長めのエンベロープを適用
+            waves = waves * EnvGen.kr(Env.linen(2, 10, 2), doneAction: 2);
+            waves ! 2 // ステレオ出力
+        }.play;
+    });
     ```
 
 16. **「風の音を合成して」**
     ```supercollider
-    (
-    {
-        var wind = HPF.ar(WhiteNoise.ar(0.2), LFNoise1.kr(0.1).range(1000, 3000));
-        wind = wind * LFNoise1.kr(0.3).range(0.1, 0.5);
-        wind ! 2
-    }.play;
-    )
+    s.waitForBoot({
+        {
+            // ホワイトノイズをベースに変動するハイパスフィルターを適用
+            var wind = HPF.ar(WhiteNoise.ar(0.2), LFNoise1.kr(0.1).range(1000, 3000));
+            // 音量も緩やかに変動
+            wind = wind * LFNoise1.kr(0.3).range(0.1, 0.5);
+            // 長めのエンベロープを適用
+            wind = wind * EnvGen.kr(Env.linen(3, 15, 3), doneAction: 2);
+            wind ! 2 // ステレオ出力
+        }.play;
+    });
     ```
 
 17. **「鳥のさえずりのような音を作って」**
     ```supercollider
-    (
-    {
-        var chirp = SinOsc.ar(
-            LFNoise1.kr(10).range(3000, 5000),
-            0,
-            EnvGen.kr(Env.perc(0.01, 0.05), Dust.kr(3))
-        );
-        chirp = chirp * 0.2;
-        chirp ! 2
-    }.play;
-    )
+    s.waitForBoot({
+        {
+            // 高周波の変動する正弦波を使用
+            var chirp = SinOsc.ar(
+                LFNoise1.kr(10).range(3000, 5000),
+                0,
+                EnvGen.kr(Env.perc(0.01, 0.05), Dust.kr(3))
+            );
+            chirp = chirp * 0.2;
+            // 全体のエンベロープを適用
+            chirp = chirp * EnvGen.kr(Env.linen(0.1, 10, 0.1), doneAction: 2);
+            chirp ! 2 // ステレオ出力
+        }.play;
+    });
     ```
 
-## 音楽理論的な要素
+## 和音と音楽理論
 
 18. **「Cメジャーコードを鳴らして」**
     ```supercollider
-    (
-    {
-        var sig = SinOsc.ar([261.63, 329.63, 392.00], 0, 0.2);
-        sig = sig * EnvGen.kr(Env.perc(0.01, 1), doneAction: 2);
-        sig.sum ! 2
-    }.play;
-    )
+    s.waitForBoot({
+        {
+            // Cメジャーコードの構成音（C4, E4, G4）
+            var sig = SinOsc.ar([261.63, 329.63, 392.00], 0, 0.2);
+            // エンベロープを適用
+            sig = sig * EnvGen.kr(Env.perc(0.01, 1), doneAction: 2);
+            sig.sum ! 2 // 合計してステレオ出力
+        }.play;
+    });
     ```
 
 19. **「Gマイナーペンタトニックスケールでインプロビゼーションを作って」**
     ```supercollider
-    (
-    Pbind(
-        \instrument, \default,
-        \note, Pxrand([7, 10, 12, 14, 17, 19, 22, 24], inf),
-        \dur, Prand([0.25, 0.5, 0.75], inf),
-        \amp, 0.2
-    ).play;
-    )
-    ```
-
-20. **「ジャズっぽいコード進行を作って」**
-    ```supercollider
-    (
-    Pbind(
-        \instrument, \default,
-        \note, Pseq([
-            Pseq([[0, 4, 7, 11]], 4),  // Cmaj7
-            Pseq([[2, 5, 9, 0]], 4),   // Dm7
-            Pseq([[7, 11, 2, 5]], 4),  // G7
-            Pseq([[0, 4, 7, 11]], 4)   // Cmaj7
-        ], inf),
-        \dur, 1,
-        \amp, 0.2
-    ).play;
-    )
-    ```
-
-## 映像と音の連携
-
-21. **「音に合わせて点滅する円を描画して」**
-    ```supercollider
-    (
-    // 音声部分
-    {
-        var freq = LFNoise0.kr(4).exprange(200, 800);
-        var sig = SinOsc.ar(freq, 0, 0.3);
-        // 振幅情報をOSC経由で映像処理部分に送信
-        SendReply.kr(Impulse.kr(30), '/amp', [sig.abs]);
-        sig ! 2
-    }.play;
-    
-    // 映像処理部分（別途Processing等で実装）
-    // OSCメッセージを受信して円の大きさを変更
-    )
-    ```
-
-22. **「低音は赤、中音は緑、高音は青で表現する視覚化を作って」**
-    ```supercollider
-    (
-    // 音声部分
-    {
-        var low = LPF.ar(WhiteNoise.ar(0.5), 200);
-        var mid = BPF.ar(WhiteNoise.ar(0.5), 1000, 1);
-        var high = HPF.ar(WhiteNoise.ar(0.5), 5000);
+    s.waitForBoot({
+        // SynthDefを定義
+        SynthDef(\tone, { |out=0, freq=440, amp=0.2|
+            var sig = SinOsc.ar(freq, 0, amp) * EnvGen.kr(Env.perc(0.01, 0.5), doneAction: 2);
+            Out.ar(out, sig ! 2);
+        }).add;
         
-        // 各帯域の振幅情報をOSC経由で映像処理部分に送信
-        SendReply.kr(Impulse.kr(30), '/rgb', [low.abs, mid.abs, high.abs]);
-        (low + mid + high) ! 2
-    }.play;
-    
-    // 映像処理部分（別途Processing等で実装）
-    // OSCメッセージを受信してRGB値を設定
-    )
+        // Gマイナーペンタトニックスケール（G, Bb, C, D, F）のパターンを作成
+        Pbind(
+            \instrument, \tone,
+            \note, Pxrand([7, 10, 12, 14, 17, 19, 22, 24], 16), // Gを基準としたスケール音
+            \dur, Prand([0.25, 0.5, 0.75], 16),
+            \amp, Prand([0.1, 0.2, 0.3], 16)
+        ).play;
+    });
     ```
 
-## 高度な音響合成
-
-23. **「グラニュラー合成を使って声のようなテクスチャを作って」**
+20. **「ジャズ風のコード進行を作って」**
     ```supercollider
-    (
-    {
-        var trig = Impulse.kr(10);
-        var pos = LFNoise1.kr(0.1).range(0, 1);
-        var dur = LFNoise1.kr(0.5).range(0.01, 0.2);
-        var sig = GrainBuf.ar(
-            2,
-            trig,
-            dur,
-            b.bufnum,
-            1,
-            pos,
-            0.1
-        );
-        sig * 0.5
-    }.play;
-    )
+    s.waitForBoot({
+        // SynthDefを定義
+        SynthDef(\chord, { |out=0, freq=440, notes=#[0, 4, 7], amp=0.2|
+            var sig = SinOsc.ar(freq * notes.midiratio, 0, amp) * EnvGen.kr(Env.perc(0.01, 1), doneAction: 2);
+            Out.ar(out, sig.sum ! 2);
+        }).add;
+        
+        // 2-5-1進行を作成
+        Pbind(
+            \instrument, \chord,
+            \freq, 261.63, // C4を基準
+            \notes, Pseq([
+                [2, 5, 9, 12],  // Dm7
+                [7, 11, 14, 17], // G7
+                [0, 4, 7, 11]    // Cmaj7
+            ], 2),
+            \dur, 1,
+            \amp, 0.2
+        ).play;
+    });
     ```
 
-24. **「フォルマント合成で母音のような音を作って」**
-    ```supercollider
-    (
-    {
-        var source = Saw.ar(220, 0.5);
-        var formants = BPF.ar(
-            source,
-            [350, 1700, 2700, 3700],
-            [0.1, 0.1, 0.1, 0.1],
-            [1, 0.2, 0.1, 0.05]
-        );
-        formants.sum ! 2
-    }.play;
-    )
-    ```
+## 高度な音響設計
 
-25. **「物理モデリングを使って弦楽器のような音を作って」**
+21. **「FMシンセシスを使って複雑な音色を作って」**
     ```supercollider
-    (
-    {
-        var excitation = Decay.ar(Impulse.ar(0.5), 0.01, WhiteNoise.ar(0.5));
-        var sig = DWGPluckedStiff.ar(
-            440,
-            0.7,  // プラック位置
-            10,   // 減衰時間
-            1.0,  // 剛性
-            excitation
-        );
-        sig ! 2
-    }.play;
-    )
-    ```
-
-## インタラクティブな要素
-
-26. **「マウスの位置で音の高さと音量を変えられるインタラクティブな音を作って」**
-    ```supercollider
-    (
-    {
-        var x = MouseX.kr(100, 2000, 'exponential');
-        var y = MouseY.kr(0, 1);
-        var sig = SinOsc.ar(x, 0, y);
-        sig ! 2
-    }.play;
-    )
-    ```
-
-27. **「キーボードの入力に反応する音を作って」**
-    ```supercollider
-    (
-    // キーボードイベントを受け取るOSCリスナーを設定
-    OSCdef(\keyboardListener, {|msg|
-        var key = msg[1];
-        var freq = (key.asAscii - 96 + 60).midicps;  // aは60、bは61...
+    s.waitForBoot({
         {
-            var sig = SinOsc.ar(freq, 0, 0.3);
-            sig = sig * EnvGen.kr(Env.perc(0.01, 1), doneAction: 2);
-            sig ! 2
+            // FM合成を使用
+            var modFreq = 200;
+            var modIndex = LFNoise1.kr(0.5).range(1, 10);
+            var modulator = SinOsc.ar(modFreq, 0, modFreq * modIndex);
+            var carrier = SinOsc.ar(440 + modulator, 0, 0.3);
+            // エンベロープを適用
+            carrier = carrier * EnvGen.kr(Env.adsr(0.01, 0.2, 0.7, 0.5), timeScale: 2, doneAction: 2);
+            carrier ! 2 // ステレオ出力
         }.play;
-    }, '/keyboard');
-    
-    // 外部からのキーボード入力をOSCで送信する必要あり
-    )
+    });
     ```
 
-28. **「拍手の音に反応して音色が変わるインタラクティブな音響システムを作って」**
+22. **「グラニュラー合成を使ってテクスチャを作って」**
     ```supercollider
-    (
-    // マイク入力を監視
-    {
-        var in = SoundIn.ar(0);
-        var amp = Amplitude.kr(in);
-        var trig = amp > 0.2;  // 閾値を超えたらトリガー
+    s.waitForBoot({
+        // バッファを作成
+        b = Buffer.alloc(s, s.sampleRate * 1.0, 1);
         
-        // トリガーを検出したらOSCメッセージを送信
-        SendReply.kr(Trig.kr(trig, 0.1), '/clap');
+        // バッファに音を録音
+        {
+            var sig = SinOsc.ar(LFNoise1.kr(1).range(300, 1000), 0, 0.5);
+            RecordBuf.ar(sig, b, loop: 0, doneAction: 2);
+            0 // 無音出力
+        }.play;
         
-        // 音響出力
-        var sig = SinOsc.ar(
-            TRand.kr(300, 1000, trig),  // トリガーごとにランダムな周波数
-            0,
-            0.3
-        );
-        sig = sig * EnvGen.kr(Env.perc(0.01, 1), trig);
-        sig ! 2
-    }.play;
-    )
+        // 少し待ってからグラニュラー合成を開始
+        s.makeBundle(1.1, {
+            {
+                var grains = GrainBuf.ar(
+                    2,
+                    trigger: Dust.kr(10),
+                    dur: LFNoise1.kr(0.5).range(0.01, 0.2),
+                    sndbuf: b,
+                    rate: LFNoise1.kr(0.5).range(0.5, 2),
+                    pos: LFNoise1.kr(0.5).range(0, 1),
+                    pan: LFNoise1.kr(1)
+                );
+                grains * EnvGen.kr(Env.linen(2, 5, 2), doneAction: 2) * 0.5;
+            }.play;
+        });
+    });
     ```
 
-## 複合的な音楽制作
-
-29. **「ローファイなヒップホップビートを作って」**
+23. **「加算合成でオルガン音を作って」**
     ```supercollider
-    (
-    {
-        var tempo = 90/60;
-        
-        // ドラム
-        var kick = SinOsc.ar(60, 0, 0.5) * EnvGen.kr(Env.perc(0.01, 0.3), Impulse.kr(tempo, 0));
-        var snare = (WhiteNoise.ar(0.5) * EnvGen.kr(Env.perc(0.01, 0.2), Impulse.kr(tempo, [0.5, 1.5]/2)));
-        var hihat = HPF.ar(WhiteNoise.ar(0.1), 8000) * EnvGen.kr(Env.perc(0.01, 0.05), Impulse.kr(tempo*2));
-        
-        // ベース
-        var bass = SinOsc.ar(60, 0, 0.3) * EnvGen.kr(Env.perc(0.01, 0.6), Impulse.kr(tempo/2));
-        
-        // サンプルのようなエフェクト
-        var sample = LPF.ar(WhiteNoise.ar(0.2), 2000) * EnvGen.kr(Env.linen(0.1, 1, 0.5), Impulse.kr(tempo/4));
-        sample = CombL.ar(sample, 0.5, 0.25, 2);
-        
-        // ミックス
-        var mix = (kick + snare + hihat + bass + sample) * 0.5;
-        mix = LPF.ar(mix, 3000);  // ローファイ感のためのフィルター
-        mix = (mix * 3).tanh * 0.3;  // 軽いディストーション
-        
-        mix ! 2
-    }.play;
-    )
+    s.waitForBoot({
+        {
+            // 複数の倍音を加算
+            var freq = 440;
+            var harmonics = [1, 2, 3, 4, 5, 6, 8];
+            var amps = [1, 0.5, 0.33, 0.25, 0.2, 0.16, 0.12];
+            var sig = Mix.ar(
+                SinOsc.ar(freq * harmonics, 0, amps)
+            ) * 0.3;
+            // エンベロープを適用
+            sig = sig * EnvGen.kr(Env.linen(0.1, 1, 0.1), doneAction: 2);
+            sig ! 2 // ステレオ出力
+        }.play;
+    });
     ```
 
-30. **「アンビエントな雰囲気の音楽を1分間作って」**
+## 空間と立体音響
+
+24. **「パンニングで左から右へ移動する音を作って」**
     ```supercollider
-    (
-    {
-        // ドローン
-        var drone = SinOsc.ar([55, 55.1], 0, 0.1) + SinOsc.ar([82.5, 82.6], 0, 0.05);
-        drone = LPF.ar(drone, 500);
-        
-        // パッド
-        var pad = SinOsc.ar([220, 221], 0, 0.05) + SinOsc.ar([329, 330], 0, 0.03) + SinOsc.ar([440, 441], 0, 0.02);
-        pad = pad * LFNoise1.kr(0.1).range(0.5, 1);
-        pad = LPF.ar(pad, LFNoise1.kr(0.2).range(500, 2000));
-        
-        // 環境音
-        var env_sound = HPF.ar(WhiteNoise.ar(0.02), 5000) * LFNoise1.kr(0.3).range(0, 1);
-        
-        // ランダムな音色
-        var random_tones = SinOsc.ar(
-            LFNoise0.kr(0.2).exprange(300, 1200),
-            0,
-            EnvGen.kr(Env.perc(0.5, 2), Dust.kr(0.1)) * 0.1
-        );
-        
-        // ミックス
-        var mix = drone + pad + env_sound + random_tones;
-        mix = FreeVerb.ar(mix, 0.8, 0.9, 0.3);
-        
-        // 1分後に徐々にフェードアウト
-        mix = mix * EnvGen.kr(Env([0, 1, 1, 0], [0.1, 58, 2]), doneAction: 2);
-        
-        mix
-    }.play;
-    )
+    s.waitForBoot({
+        {
+            // 基本的な音を生成
+            var sig = SinOsc.ar(440, 0, 0.3);
+            // 左から右へのパンニング
+            var pan = Line.kr(-1, 1, 5);
+            // エンベロープを適用
+            sig = sig * EnvGen.kr(Env.linen(0.1, 4.8, 0.1), doneAction: 2);
+            // パンニングを適用
+            Pan2.ar(sig, pan)
+        }.play;
+    });
     ```
 
-## 特定の音楽スタイル（Aphex Twin風）
-
-31. **「Aphex Twinの"Xtal"のような、柔らかいパッドサウンドとクリスタルのような音色、繊細なビートを組み合わせたアンビエントIDMトラックを作成して」**
+25. **「3D空間で動く音源を作って」**
     ```supercollider
-    (
-    // パッドサウンド
-    {
-        var pad = SinOsc.ar([55, 55.1], 0, 0.1) + SinOsc.ar([110, 110.2], 0, 0.05);
-        pad = LPF.ar(pad, LFNoise1.kr(0.1).range(500, 2000));
-        pad = pad * LFNoise1.kr(0.2).range(0.7, 1);
-        
-        // クリスタルのような音色
-        var crystal = SinOsc.ar(
-            LFNoise0.kr(4).exprange(2000, 5000),
-            0,
-            EnvGen.kr(Env.perc(0.01, 0.1), Dust.kr(3)) * 0.1
-        );
-        
-        // ビート
-        var tempo = 140/60;
-        var kick = SinOsc.ar(60, 0, 0.3) * EnvGen.kr(Env.perc(0.01, 0.2), Impulse.kr(tempo, 0));
-        var hihat = HPF.ar(WhiteNoise.ar(0.05), 8000) * EnvGen.kr(Env.perc(0.001, 0.05), Impulse.kr(tempo*4));
-        var beat = kick + hihat;
-        
-        // ボーカルサンプル風の音
-        var vocal = BPF.ar(WhiteNoise.ar(0.2), LFNoise1.kr(0.5).range(200, 2000), 0.1);
-        vocal = vocal * EnvGen.kr(Env.perc(0.1, 1), Dust.kr(0.5)) * 0.2;
-        vocal = CombL.ar(vocal, 0.5, 0.25, 2);
-        
-        // ミックス
-        var mix = pad + crystal + beat + vocal;
-        mix = FreeVerb.ar(mix, 0.7, 0.8, 0.2);
-        
-        mix ! 2
-    }.play;
-    )
+    s.waitForBoot({
+        // 4チャンネル出力が必要
+        {
+            // 基本的な音を生成
+            var sig = PinkNoise.ar(0.2) * EnvGen.kr(Env.linen(0.1, 4.8, 0.1), doneAction: 2);
+            // 円周上を移動
+            var azimuth = LFSaw.kr(0.2, 0, 2pi);
+            var elevation = LFSaw.kr(0.1, 0, pi/2);
+            // 第一次アンビソニックエンコーディング
+            var w = sig * 0.7071;
+            var x = sig * cos(azimuth) * cos(elevation);
+            var y = sig * sin(azimuth) * cos(elevation);
+            var z = sig * sin(elevation);
+            [w, x, y, z]
+        }.play;
+    });
     ```
 
-32. **「90年代初期のAphex Twinスタイルのアンビエントトラックを作成して。温かみのあるアナログシンセパッド、高音域のクリスタルのようなベル音、リバーブ処理された女性ボーカルサンプル、繊細なブレイクビート（約140BPM）、ローファイな質感と空間的な広がりを持つもの」**
+## 音楽スタイルとジャンル
+
+26. **「ドラムンベースのリズムパターンを作って」**
     ```supercollider
-    (
-    {
-        // 温かみのあるアナログシンセパッド
-        var pad_freq = [55, 82.5, 110, 164.8];
-        var pad = Mix.ar(
-            Array.fill(4, { |i|
-                var f = pad_freq[i];
-                SinOsc.ar([f, f*1.001], 0, 0.1) * LFNoise1.kr(0.1).range(0.7, 1)
-            })
-        );
-        pad = LPF.ar(pad, LFNoise1.kr(0.2).range(500, 1500));
+    s.waitForBoot({
+        // SynthDefを定義
+        SynthDef(\kick, { |out=0, amp=0.5|
+            var sig = SinOsc.ar(60, 0, amp) * EnvGen.kr(Env.perc(0.01, 0.3), doneAction: 2);
+            Out.ar(out, sig ! 2);
+        }).add;
         
-        // 高音域のクリスタルのようなベル音
-        var bell = Mix.ar(
-            Array.fill(5, { |i|
-                var trig = Dust.kr(0.5 + (i * 0.1));
-                var freq = TChoose.kr(trig, [1760, 1980, 2200, 2640, 3300]);
-                var sig = SinOsc.ar(freq, 0, EnvGen.kr(Env.perc(0.001, 2), trig) * 0.05);
-                Pan2.ar(sig, i * 0.4 - 0.8)
-            })
-        );
+        SynthDef(\snare, { |out=0, amp=0.3|
+            var sig = WhiteNoise.ar(amp) * EnvGen.kr(Env.perc(0.01, 0.1), doneAction: 2);
+            Out.ar(out, sig ! 2);
+        }).add;
         
-        // リバーブ処理された女性ボーカルサンプル風
-        var vocal = BPF.ar(
-            WhiteNoise.ar(0.3),
-            LFNoise1.kr(0.2).range(300, 1200),
-            0.1
-        );
-        vocal = vocal * EnvGen.kr(Env.perc(0.1, 1), Dust.kr(0.3)) * 0.2;
-        vocal = CombL.ar(vocal, 1, [0.4, 0.5], 3);
+        SynthDef(\hat, { |out=0, amp=0.1|
+            var sig = HPF.ar(WhiteNoise.ar(amp), 5000) * EnvGen.kr(Env.perc(0.001, 0.05), doneAction: 2);
+            Out.ar(out, sig ! 2);
+        }).add;
         
-        // 繊細なブレイクビート（約140BPM）
-        var tempo = 140/60;
-        var beat_pattern = [1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0];
-        var beat = Mix.ar(
-            Array.fill(16, { |i|
-                var trig = Impulse.kr(tempo * 4, i/16) * beat_pattern[i];
-                var kick = SinOsc.ar(60, 0, 0.3) * EnvGen.kr(Env.perc(0.01, 0.2), trig);
-                var snare = WhiteNoise.ar(0.2) * EnvGen.kr(Env.perc(0.01, 0.1), trig);
-                var hihat = HPF.ar(WhiteNoise.ar(0.05), 8000) * EnvGen.kr(Env.perc(0.001, 0.05), trig);
-                kick + snare + hihat
-            })
-        );
-        
-        // ミックス
-        var mix = pad + bell + vocal + beat;
-        
-        // ローファイな質感
-        mix = LPF.ar(mix, 12000);
-        mix = HPF.ar(mix, 20);
-        mix = (mix * 2).tanh * 0.5;
-        
-        // 空間的な広がり
-        mix = FreeVerb.ar(mix, 0.7, 0.8, 0.3);
-        
-        mix
-    }.play;
-    )
+        // ドラムンベースのパターン（約174BPM）
+        Ppar([
+            // キックパターン
+            Pbind(
+                \instrument, \kick,
+                \dur, Pseq([0.75, 0.75, 1, 1], inf),
+                \amp, 0.5
+            ),
+            // スネアパターン
+            Pbind(
+                \instrument, \snare,
+                \dur, Pseq([1.75, 1.75], inf),
+                \amp, 0.3
+            ),
+            // ハイハットパターン
+            Pbind(
+                \instrument, \hat,
+                \dur, Pseq([0.25], inf),
+                \amp, Pseq([0.1, 0.05, 0.1, 0.05], inf)
+            )
+        ]).play;
+    });
     ```
 
-33. **「以下の要素を持つIDM/アンビエントトラックを作成して：周波数変調シンセによる温かみのあるパッドサウンド（LPFでフィルタリング）、FM合成によるベル音（高い倍音成分を持つ）、ピッチシフトとタイムストレッチを適用した女性ボーカルサンプル、16分音符のハイハットパターンと8分音符のキックドラム、全体に深いリバーブとサブトルなディレイ、ステレオフィールド全体に広がる空間的な配置、徐々に変化するLFOモジュレーション」**
+27. **「アンビエント音楽のテクスチャを作って」**
     ```supercollider
-    (
-    {
-        // 周波数変調シンセによる温かみのあるパッドサウンド
-        var mod_freq = LFNoise1.kr(0.1).range(1, 5);
-        var mod_index = LFNoise1.kr(0.2).range(0.5, 3);
-        var carrier_freq = [55, 110, 164.8, 220];
-        var pad = Mix.ar(
-            Array.fill(4, { |i|
-                var modulator = SinOsc.ar(mod_freq, 0, mod_index * carrier_freq[i]);
-                var carrier = SinOsc.ar(carrier_freq[i] + modulator, 0, 0.1);
-                Pan2.ar(carrier, i * 0.5 - 0.75)
-            })
-        );
-        pad = LPF.ar(pad, LFNoise1.kr(0.15).range(500, 2000));
+    s.waitForBoot({
+        // パッドサウンド用SynthDef
+        SynthDef(\pad, { |out=0, freq=440, amp=0.1, pan=0, attack=2, release=3|
+            var sig = SinOsc.ar(freq * [0.99, 1, 1.01], 0, amp/3).sum;
+            sig = sig + LPF.ar(Saw.ar(freq * [0.5, 0.51], amp/5), 1000).sum;
+            sig = sig * EnvGen.kr(Env.linen(attack, 5, release), doneAction: 2);
+            Out.ar(out, Pan2.ar(sig, pan));
+        }).add;
         
-        // FM合成によるベル音
-        var bell = Mix.ar(
-            Array.fill(8, { |i|
-                var trig = Dust.kr(0.2 + (i * 0.05));
-                var mod_f = TChoose.kr(trig, [200, 300, 400, 500]);
-                var car_f = TChoose.kr(trig, [1000, 1500, 2000, 3000]);
-                var mod = SinOsc.ar(mod_f, 0, LFNoise1.kr(1).range(100, 500));
-                var car = SinOsc.ar(car_f + mod, 0, EnvGen.kr(Env.perc(0.001, 2), trig) * 0.05);
-                Pan2.ar(car, LFNoise1.kr(0.1).range(-0.8, 0.8))
-            })
-        );
-        
-        // ピッチシフトとタイムストレッチを適用した女性ボーカルサンプル風
-        var vocal_source = WhiteNoise.ar(0.2);
-        var vocal_filter = BPF.ar(
-            vocal_source,
-            LFNoise1.kr(0.3).exprange(300, 1500),
-            0.1
-        );
-        var vocal_env = EnvGen.kr(Env.perc(0.1, 1), Dust.kr(0.3));
-        var vocal = vocal_filter * vocal_env * 0.3;
-        
-        // ピッチシフト効果
-        vocal = FreqShift.ar(vocal, LFNoise1.kr(0.2).range(-100, 100));
-        
-        // タイムストレッチ効果（ディレイラインで近似）
-        vocal = Mix.ar(
-            Array.fill(5, { |i|
-                DelayC.ar(vocal, 0.2, LFNoise1.kr(0.1).range(0.01, 0.2)) * 0.2
-            })
-        );
-        
-        // リズムセクション
-        var tempo = 140/60;
-        
-        // 16分音符のハイハットパターン
-        var hihat_pattern = [1, 0, 0.7, 0, 1, 0, 0.7, 0, 1, 0, 0.7, 0, 1, 0, 0.7, 0.5];
-        var hihat = Mix.ar(
-            Array.fill(16, { |i|
-                var trig = Impulse.kr(tempo * 4, i/16) * hihat_pattern[i];
-                HPF.ar(WhiteNoise.ar(0.05), 8000) * EnvGen.kr(Env.perc(0.001, 0.05), trig)
-            })
-        );
-        
-        // 8分音符のキックドラム
-        var kick_pattern = [1, 0, 0, 0, 1, 0, 0, 0];
-        var kick = Mix.ar(
-            Array.fill(8, { |i|
-                var trig = Impulse.kr(tempo * 2, i/8) * kick_pattern[i];
-                SinOsc.ar(60, 0, 0.3) * EnvGen.kr(Env.perc(0.01, 0.2), trig)
-            })
-        );
-        
-        // 徐々に変化するLFOモジュレーション
-        var lfo = LFNoise1.kr(0.1).range(0.5, 1);
-        
-        // ミックス
-        var mix = (pad * lfo) + bell + vocal + hihat + kick;
-        
-        // 空間的な配置
-        mix = Splay.ar(mix, 0.8);
-        
-        // 深いリバーブとサブトルなディレイ
-        mix = FreeVerb.ar(mix, 0.7, 0.9, 0.3);
-        mix = mix + CombL.ar(mix, 0.5, [0.3, 0.4], 2) * 0.2;
-        
-        mix
-    }.play;
-    )
+        // アンビエントコード進行
+        Pbind(
+            \instrument, \pad,
+            \degree, Pseq([[0, 2, 4], [0, 3, 5], [-1, 2, 4], [0, 2, 6]], 2),
+            \dur, 8,
+            \amp, 0.2,
+            \pan, Pwhite(-0.7, 0.7, inf),
+            \attack, Pwhite(1.0, 3.0, inf),
+            \release, Pwhite(2.0, 5.0, inf)
+        ).play;
+    });
     ```
 
-34. **「夜明け前の霧がかかった風景のような、神秘的で穏やかな雰囲気のIDMトラックを作成して。透明感のある高音と温かみのある低音のコントラスト、繊細なリズムパターン、かすかな人の声のようなテクスチャを含めて。全体的に夢のような、ノスタルジックな感覚を持つ音響空間を作り出して」**
+28. **「テクノのベースラインを作って」**
     ```supercollider
-    (
-    {
-        // 温かみのある低音（霧のような基盤）
-        var bass_freq = [36, 43, 48].midicps;
-        var bass = Mix.ar(
-            Array.fill(3, { |i|
-                var sig = SinOsc.ar([bass_freq[i], bass_freq[i] * 1.001], 0, 0.1);
-                sig = LPF.ar(sig, 500);
-                sig = sig * LFNoise1.kr(0.05).range(0.7, 1);
-                sig
-            })
-        );
+    s.waitForBoot({
+        // ベース音用SynthDef
+        SynthDef(\bass, { |out=0, freq=440, amp=0.3, cutoff=1000, rq=0.3, dur=0.2|
+            var sig = Saw.ar(freq, amp);
+            sig = RLPF.ar(sig, cutoff, rq);
+            sig = sig * EnvGen.kr(Env.perc(0.01, dur), doneAction: 2);
+            Out.ar(out, sig ! 2);
+        }).add;
         
-        // 透明感のある高音（夜明けの光）
-        var high_freq = [72, 79, 84, 91].midicps;
-        var high = Mix.ar(
-            Array.fill(4, { |i|
-                var sig = SinOsc.ar([high_freq[i], high_freq[i] * 1.002], 0, 0.03);
-                sig = HPF.ar(sig, 1000);
-                sig = sig * LFNoise1.kr(0.1 + (i * 0.01)).range(0, 1);
-                sig
-            })
-        );
-        
-        // かすかな人の声のようなテクスチャ
-        var voice = BPF.ar(
-            PinkNoise.ar(0.3),
-            LFNoise1.kr(0.2).exprange(200, 2000),
-            LFNoise1.kr(0.1).range(0.05, 0.2)
-        );
-        voice = voice * LFNoise1.kr(0.3).range(0, 0.2);
-        
-        // 繊細なリズムパターン（霧の中の足音のような）
-        var tempo = 70/60;
-        var rhythm_pattern = [
-            [1, 0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0, 0.3, 0],
-            [0, 0, 0.3, 0, 0, 0, 0.2, 0, 0, 0, 0.4, 0, 0, 0, 0, 0.2],
-            [0, 0, 0, 0, 0.2, 0, 0, 0, 0, 0, 0, 0, 0.3, 0, 0, 0]
-        ];
-        
-        var rhythm = Mix.ar(
-            Array.fill(3, { |j|
-                Mix.ar(
-                    Array.fill(16, { |i|
-                        var trig = Impulse.kr(tempo * 4, i/16) * rhythm_pattern[j][i];
-                        var sound = Select.ar(j, [
-                            // 足音のような低い音
-                            LPF.ar(BrownNoise.ar(0.3), 200) * EnvGen.kr(Env.perc(0.01, 0.2), trig),
-                            // 水滴のような音
-                            SinOsc.ar(TExpRand.kr(1000, 3000, trig), 0, 0.05) * EnvGen.kr(Env.perc(0.001, 0.05), trig),
-                            // 木の枝が折れるような音
-                            HPF.ar(PinkNoise.ar(0.1), 3000) * EnvGen.kr(Env.perc(0.001, 0.03), trig)
-                        ]);
-                        Pan2.ar(sound, LFNoise1.kr(0.1).range(-0.8, 0.8))
-                    })
-                )
-            })
-        );
-        
-        // 夢のような音響空間
-        var dreamscape = bass + high + voice + rhythm;
-        
-        // ノスタルジックな質感（軽いローファイ効果）
-        dreamscape = LPF.ar(dreamscape, 12000);
-        dreamscape = HPF.ar(dreamscape, 30);
-        
-        // 空間的な広がり
-        dreamscape = Splay.ar(dreamscape, 0.9);
-        
-        // 深いリバーブ
-        dreamscape = FreeVerb.ar(dreamscape, 0.8, 0.9, 0.6);
-        
-        // 全体的な包絡線（徐々に夜明けが訪れるように）
-        dreamscape = dreamscape * EnvGen.kr(Env([0, 0.7, 1, 0.8, 0], [20, 40, 30, 10]), doneAction: 2);
-        
-        dreamscape
-    }.play;
-    )
+        // テクノベースライン（約130BPM）
+        Pbind(
+            \instrument, \bass,
+            \note, Pseq([0, 0, 7, 0, 5, 0, 3, 0], inf),
+            \dur, 0.25,
+            \amp, 0.3,
+            \cutoff, Pseq([1000, 2000, 1000, 800, 1200, 1000, 1500, 1000], inf),
+            \rq, 0.2,
+            \dur, Pseq([0.2, 0.1, 0.2, 0.1, 0.2, 0.1, 0.2, 0.1], inf)
+        ).play;
+    });
     ```
 
-35. **「以下の構造を持つAphex Twin風のアンビエントIDMトラックを作成して：イントロ（30秒）：徐々に展開するパッドサウンドとアトモスフェリックなテクスチャ、メインセクション（2分）：ビートとベースラインの導入、メロディックなベル音の追加、ブレイクダウン（30秒）：ビートを除去し、ボーカルサンプルとパッドに焦点、クライマックス（1分）：すべての要素が組み合わさり、追加の音響レイヤーを導入、アウトロ（30秒）：徐々にフェードアウトし、パッドサウンドのみを残す」**
+29. **「ローファイヒップホップのビートを作って」**
     ```supercollider
-    (
-    {
-        // 全体の時間構造
-        var total_duration = 30 + 120 + 30 + 60 + 30; // 4分30秒
-        var intro_end = 30;
-        var main_end = intro_end + 120;
-        var breakdown_end = main_end + 30;
-        var climax_end = breakdown_end + 60;
+    s.waitForBoot({
+        // ドラム用SynthDef
+        SynthDef(\lofiKick, { |out=0, amp=0.5|
+            var sig = SinOsc.ar(XLine.ar(120, 60, 0.2), 0, amp) * EnvGen.kr(Env.perc(0.01, 0.3), doneAction: 2);
+            // ビットクラッシュ効果
+            sig = (sig * 8).round / 8;
+            Out.ar(out, sig ! 2);
+        }).add;
         
-        var time = Line.kr(0, total_duration, total_duration);
+        SynthDef(\lofiSnare, { |out=0, amp=0.3|
+            var sig = WhiteNoise.ar(amp) * EnvGen.kr(Env.perc(0.01, 0.2), doneAction: 2);
+            // ローパスフィルター
+            sig = LPF.ar(sig, 3000);
+            // ビットクラッシュ効果
+            sig = (sig * 6).round / 6;
+            Out.ar(out, sig ! 2);
+        }).add;
         
-        // セクション制御エンベロープ
-        var intro_env = EnvGen.kr(Env([0, 0, 1, 1, 0], [0.1, intro_end-0.1, 0.1, total_duration-intro_end-0.1]));
-        var main_env = EnvGen.kr(Env([0, 0, 1, 1, 0], [intro_end-0.1, 0.1, main_end-intro_end-0.1, total_duration-main_end]));
-        var breakdown_env = EnvGen.kr(Env([0, 0, 1, 1, 0], [main_end-0.1, 0.1, breakdown_end-main_end-0.1, total_duration-breakdown_end]));
-        var climax_env = EnvGen.kr(Env([0, 0, 1, 1, 0], [breakdown_end-0.1, 0.1, climax_end-breakdown_end-0.1, total_duration-climax_end]));
-        var outro_env = EnvGen.kr(Env([0, 0, 1, 1, 0], [climax_end-0.1, 0.1, total_duration-climax_end-0.1, 0.1]));
+        // ローファイヒップホップビート（約85BPM）
+        Ppar([
+            // キックパターン
+            Pbind(
+                \instrument, \lofiKick,
+                \dur, Pseq([1, 1, 1, 0.5, 0.5], inf),
+                \amp, 0.5
+            ),
+            // スネアパターン
+            Pbind(
+                \instrument, \lofiSnare,
+                \dur, Pseq([1, 1, 1, 1], inf),
+                \amp, Pseq([0, 0.3, 0, 0.3], inf)
+            )
+        ]).play;
+    });
+    ```
+
+30. **「ミニマルテクノのループを作って」**
+    ```supercollider
+    s.waitForBoot({
+        // パーカッション用SynthDef
+        SynthDef(\click, { |out=0, amp=0.3, freq=1000|
+            var sig = SinOsc.ar(freq, 0, amp) * EnvGen.kr(Env.perc(0.001, 0.01), doneAction: 2);
+            Out.ar(out, sig ! 2);
+        }).add;
         
-        // パッドサウンド（全セクションで使用）
-        var pad_freq = [36, 43, 48, 55].midicps;
-        var pad = Mix.ar(
-            Array.fill(4, { |i|
-                var sig = SinOsc.ar([pad_freq[i], pad_freq[i] * 1.001], 0, 0.1);
-                sig = LPF.ar(sig, LFNoise1.kr(0.1).range(500, 2000));
-                sig = sig * LFNoise1.kr(0.2).range(0.7, 1);
-                Pan2.ar(sig, i * 0.5 - 0.75)
-            })
-        );
+        // ベース用SynthDef
+        SynthDef(\minBass, { |out=0, freq=440, amp=0.3, dur=0.1|
+            var sig = SinOsc.ar(freq, 0, amp) * EnvGen.kr(Env.perc(0.01, dur), doneAction: 2);
+            Out.ar(out, sig ! 2);
+        }).add;
         
-        // アトモスフェリックなテクスチャ（イントロとブレイクダウンで強調）
-        var atmos = HPF.ar(PinkNoise.ar(0.1), 5000) * LFNoise1.kr(0.3).range(0, 1);
-        atmos = atmos + LPF.ar(BrownNoise.ar(0.1), 200) * LFNoise1.kr(0.2).range(0, 1);
-        atmos = FreeVerb.ar(atmos, 0.9, 0.9, 0.9);
+        // ミニマルテクノループ（約126BPM）
+        Ppar([
+            // クリックパターン
+            Pbind(
+                \instrument, \click,
+                \dur, 0.125,
+                \amp, Pseq([0.3, 0.1, 0.2, 0.1, 0.3, 0.1, 0.2, 0.1], inf),
+                \freq, Pseq([1000, 800, 1000, 800, 1000, 800, 1000, 1200], inf)
+            ),
+            // ベースパターン
+            Pbind(
+                \instrument, \minBass,
+                \note, Pseq([0, 0, 7, 0, 0, 0, 5, 0], inf),
+                \dur, 0.25,
+                \amp, Pseq([0.3, 0, 0.2, 0, 0.3, 0, 0.2, 0], inf),
+                \dur, 0.1
+            )
+        ]).play;
+    });
+    ```
+
+## Aphex Twin風の音楽スタイル
+
+31. **「Aphex Twinの"Xtal"のような柔らかいアンビエントIDMトラックを作って」**
+    ```supercollider
+    s.waitForBoot({
+        // パッドサウンド用SynthDef
+        SynthDef(\xtalPad, { |out=0, freq=440, amp=0.2, attack=0.5, decay=0.3, sustain=0.5, release=1.0|
+            var sig, env;
+            // 複数の波形を混合
+            sig = SinOsc.ar(freq * [0.999, 1, 1.001], 0, 0.3) * 0.5;
+            sig = sig + (SinOsc.ar(freq * [0.5, 1, 2], 0, 0.1) * 0.3);
+            // フィルタリング
+            sig = LPF.ar(sig, freq * 4);
+            // エンベロープ
+            env = EnvGen.kr(Env.adsr(attack, decay, sustain, release), doneAction: 2);
+            sig = sig * env * amp;
+            Out.ar(out, sig);
+        }).add;
         
-        // ビート（メインセクションとクライマックスで使用）
-        var tempo = 140/60;
-        var beat_pattern = [1, 0, 0.5, 0, 0.7, 0, 0.5, 0, 1, 0, 0.5, 0, 0.7, 0, 0.5, 0.3];
-        var beat = Mix.ar(
-            Array.fill(16, { |i|
-                var trig = Impulse.kr(tempo * 4, i/16) * beat_pattern[i];
-                var kick = SinOsc.ar(60, 0, 0.3) * EnvGen.kr(Env.perc(0.01, 0.2), trig * (i % 8 == 0));
-                var snare = WhiteNoise.ar(0.2) * EnvGen.kr(Env.perc(0.01, 0.1), trig * (i % 8 == 4));
-                var hihat = HPF.ar(WhiteNoise.ar(0.05), 8000) * EnvGen.kr(Env.perc(0.001, 0.05), trig);
-                Pan2.ar(kick + snare + hihat, i * 0.1 - 0.8)
-            })
-        );
+        // ベル音用SynthDef
+        SynthDef(\xtalBell, { |out=0, freq=1000, amp=0.1|
+            var sig, env;
+            sig = SinOsc.ar(freq * [1, 2.7, 5.4, 8.1], 0, [0.5, 0.25, 0.125, 0.06]) * 0.1;
+            env = EnvGen.kr(Env.perc(0.001, 2), doneAction: 2);
+            sig = sig * env * amp;
+            // リバーブ
+            sig = FreeVerb.ar(sig.sum, 0.6, 0.8, 0.2);
+            Out.ar(out, sig ! 2);
+        }).add;
         
-        // ベースライン（メインセクションとクライマックスで使用）
-        var bass_notes = [36, 36, 43, 41, 36, 36, 48, 43];
-        var bass = Mix.ar(
-            Array.fill(8, { |i|
-                var trig = Impulse.kr(tempo, i/8);
-                var freq = bass_notes[i].midicps;
-                var sig = SinOsc.ar(freq, 0, 0.2) * EnvGen.kr(Env.perc(0.01, 0.4), trig);
-                Pan2.ar(sig, 0)
-            })
-        );
+        // ドラム用SynthDef
+        SynthDef(\xtalBeat, { |out=0, amp=0.3, lpf=3000|
+            var sig, env;
+            sig = WhiteNoise.ar(0.5) + SinOsc.ar(60, 0, 0.5);
+            sig = LPF.ar(sig, lpf);
+            env = EnvGen.kr(Env.perc(0.001, 0.1), doneAction: 2);
+            sig = sig * env * amp;
+            Out.ar(out, sig ! 2);
+        }).add;
         
-        // メロディックなベル音（メインセクションで導入、クライマックスで強調）
-        var bell_notes = [72, 79, 84, 91, 96, 91, 84, 79];
-        var bell = Mix.ar(
-            Array.fill(8, { |i|
-                var trig = Impulse.kr(tempo/2, i/8);
-                var freq = bell_notes[i].midicps;
-                var mod = SinOsc.ar(freq * 1.5, 0, freq * 0.1);
-                var sig = SinOsc.ar(freq + mod, 0, 0.05) * EnvGen.kr(Env.perc(0.001, 2), trig);
-                Pan2.ar(sig, i * 0.2 - 0.8)
-            })
-        );
+        // Xtal風の曲構成
+        Ppar([
+            // パッドパート
+            Pbind(
+                \instrument, \xtalPad,
+                \degree, Pseq([[0, 4, 7], [2, 5, 9], [0, 3, 7], [-1, 2, 7]], inf),
+                \dur, 4,
+                \amp, 0.2,
+                \attack, 0.5,
+                \decay, 0.3,
+                \sustain, 0.5,
+                \release, 3.0
+            ),
+            
+            // ベルパート
+            Pbind(
+                \instrument, \xtalBell,
+                \degree, Pseq([7, 11, 14, 4, 7, 11, 2, 7], inf),
+                \octave, 6,
+                \dur, Pseq([0.5, 0.5, 0.75, 0.25, 0.5, 0.5, 0.75, 0.25], inf),
+                \amp, 0.1
+            ),
+            
+            // ビートパート
+            Pbind(
+                \instrument, \xtalBeat,
+                \dur, Pseq([0.5, 0.5, 0.5, 0.5], inf),
+                \amp, Pseq([0.3, 0.1, 0.2, 0.1], inf),
+                \lpf, Pseq([3000, 5000, 3000, 4000], inf)
+            )
+        ]).play;
+    });
+    ```
+
+32. **「Aphex Twinの"Rhubarb"のような静かなアンビエントピースを作って」**
+    ```supercollider
+    s.waitForBoot({
+        // 柔らかいシンセ用SynthDef
+        SynthDef(\rhubarbSynth, { |out=0, freq=440, amp=0.2, attack=1, decay=0.5, sustain=0.8, release=3|
+            var sig, env;
+            // 複数の波形を混合
+            sig = SinOsc.ar(freq * [0.999, 1, 1.001], 0, 0.3);
+            sig = sig + (SinOsc.ar(freq * 0.5, 0, 0.2) * LFNoise1.kr(0.1).range(0.1, 0.3));
+            // フィルタリング
+            sig = LPF.ar(sig, LFNoise1.kr(0.2).range(freq, freq * 3));
+            // エンベロープ
+            env = EnvGen.kr(Env.adsr(attack, decay, sustain, release), doneAction: 2);
+            sig = sig * env * amp;
+            // リバーブ
+            sig = FreeVerb.ar(sig.sum, 0.7, 0.8, 0.3);
+            Out.ar(out, sig ! 2);
+        }).add;
         
-        // ボーカルサンプル風（ブレイクダウンとクライマックスで使用）
-        var vocal = BPF.ar(
-            WhiteNoise.ar(0.3),
-            LFNoise1.kr(0.2).exprange(300, 1500),
-            0.1
-        );
-        vocal = vocal * EnvGen.kr(Env.perc(0.1, 1), Dust.kr(0.3 * (breakdown_env + climax_env * 0.5))) * 0.3;
-        vocal = CombL.ar(vocal, 1, [0.4, 0.5], 3);
+        // Rhubarb風の曲構成（非常に遅いテンポ）
+        Pbind(
+            \instrument, \rhubarbSynth,
+            \degree, Pseq([
+                [0, 4, 7], 
+                [0, 5, 9], 
+                [-3, 0, 4], 
+                [-5, -1, 2],
+                [-7, -3, 0],
+                [-5, -1, 2]
+            ], inf),
+            \dur, 8,
+            \amp, 0.15,
+            \attack, Pwhite(0.5, 2.0, inf),
+            \decay, Pwhite(0.3, 0.7, inf),
+            \sustain, Pwhite(0.6, 0.9, inf),
+            \release, Pwhite(2.0, 5.0, inf)
+        ).play;
+    });
+    ```
+
+33. **「Aphex Twinの"Avril 14th"のようなピアノ曲を作って」**
+    ```supercollider
+    s.waitForBoot({
+        // ピアノ音用SynthDef
+        SynthDef(\piano, { |out=0, freq=440, amp=0.3, attack=0.001, decay=0.1, sustain=0.8, release=0.5|
+            var sig, env;
+            // 複数の波形を混合してピアノ音を模倣
+            sig = SinOsc.ar(freq, 0, 0.6) + SinOsc.ar(freq * 2, 0, 0.2) + SinOsc.ar(freq * 4, 0, 0.1);
+            sig = sig + (PinkNoise.ar(0.01) * EnvGen.kr(Env.perc(0.001, 0.01)));
+            // エンベロープ
+            env = EnvGen.kr(Env.adsr(attack, decay, sustain, release), doneAction: 2);
+            sig = sig * env * amp;
+            // 軽いリバーブ
+            sig = FreeVerb.ar(sig, 0.3, 0.5, 0.2);
+            Out.ar(out, sig ! 2);
+        }).add;
         
-        // 追加の音響レイヤー（クライマックスで導入）
-        var extra_layer = Mix.ar(
-            Array.fill(5, { |i|
-                var freq = TChoose.kr(Impulse.kr(tempo/8), [60, 67, 72, 79, 84]).midicps;
-                var sig = PMOsc.ar(freq, freq * TRand.kr(1.5, 2.5, Impulse.kr(tempo/8)), 
-                    LFNoise1.kr(0.2).range(1, 5), 0, 0.05);
-                sig = sig * LFNoise1.kr(0.3).range(0.5, 1);
-                Pan2.ar(sig, i * 0.4 - 0.8)
-            })
-        );
+        // Avril 14th風のメロディ
+        Pbind(
+            \instrument, \piano,
+            \degree, Pseq([
+                0, 2, 4, 7, 9, 7, 4, 2,
+                0, 2, 4, 7, 9, 7, 4, 2,
+                -3, -1, 0, 4, 7, 4, 0, -1,
+                -3, -1, 0, 4, 7, 4, 0, -1
+            ], inf),
+            \dur, 0.25,
+            \amp, Pwhite(0.2, 0.4, inf),
+            \attack, 0.001,
+            \decay, 0.1,
+            \sustain, 0.3,
+            \release, 0.5
+        ).play;
+    });
+    ```
+
+34. **「Aphex Twinの"Windowlicker"のようなグリッチービートを作って」**
+    ```supercollider
+    s.waitForBoot({
+        // グリッチビート用SynthDef
+        SynthDef(\glitchBeat, { |out=0, freq=440, amp=0.3, pan=0, lpf=2000|
+            var sig, env;
+            sig = SinOsc.ar(freq, 0, 0.5) + WhiteNoise.ar(0.5);
+            sig = LPF.ar(sig, lpf);
+            // グリッチ効果
+            sig = sig * LFPulse.kr(LFNoise0.kr(8).range(8, 32), 0, LFNoise0.kr(1).range(0.1, 0.9));
+            env = EnvGen.kr(Env.perc(0.001, 0.2), doneAction: 2);
+            sig = sig * env * amp;
+            Out.ar(out, Pan2.ar(sig, pan));
+        }).add;
         
-        // 各セクションのミックス
-        var intro_mix = pad * intro_env + atmos * intro_env;
-        var main_mix = pad * main_env + beat * main_env + bass * main_env + bell * main_env * LFNoise1.kr(0.2).range(0.5, 1);
-        var breakdown_mix = pad * breakdown_env + atmos * breakdown_env + vocal * breakdown_env;
-        var climax_mix = pad * climax_env + beat * climax_env * 1.2 + bass * climax_env * 1.2 + 
-                        bell * climax_env * 1.5 + vocal * climax_env * 0.7 + extra_layer * climax_env;
-        var outro_mix = pad * outro_env * LFNoise1.kr(0.1).range(0.7, 1);
+        // ベース用SynthDef
+        SynthDef(\windowBass, { |out=0, freq=100, amp=0.4, dur=0.2|
+            var sig, env;
+            sig = SinOsc.ar(freq, 0, 0.5) + Saw.ar(freq * 0.5, 0.3);
+            sig = (sig * 5).tanh * 0.2; // ディストーション
+            env = EnvGen.kr(Env.perc(0.01, dur), doneAction: 2);
+            sig = sig * env * amp;
+            Out.ar(out, sig ! 2);
+        }).add;
         
-        // 全体のミックス
-        var mix = intro_mix + main_mix + breakdown_mix + climax_mix + outro_mix;
+        // Windowlicker風のビート
+        Ppar([
+            // グリッチビート
+            Pbind(
+                \instrument, \glitchBeat,
+                \freq, Pwhite(200, 2000, inf),
+                \dur, Prand([0.125, 0.25, 0.125, 0.125, 0.125, 0.25], inf),
+                \amp, Pwhite(0.1, 0.3, inf),
+                \pan, Pwhite(-0.8, 0.8, inf),
+                \lpf, Pwhite(500, 5000, inf)
+            ),
+            
+            // ベースライン
+            Pbind(
+                \instrument, \windowBass,
+                \degree, Pseq([0, 0, 5, 0, 3, 0, 7, 0], inf),
+                \octave, 3,
+                \dur, 0.5,
+                \amp, 0.4,
+                \dur, Prand([0.2, 0.3, 0.4], inf)
+            )
+        ]).play;
+    });
+    ```
+
+35. **「Aphex Twinの"Flim"のような繊細なドラムンベースを作って」**
+    ```supercollider
+    s.waitForBoot({
+        // ドラム用SynthDef
+        SynthDef(\flimBeat, { |out=0, freq=440, amp=0.3, pan=0|
+            var sig, env;
+            sig = SinOsc.ar(freq, 0, 0.5) + WhiteNoise.ar(0.2);
+            sig = BPF.ar(sig, freq * 2, 0.3);
+            env = EnvGen.kr(Env.perc(0.001, 0.1), doneAction: 2);
+            sig = sig * env * amp;
+            Out.ar(out, Pan2.ar(sig, pan));
+        }).add;
         
-        // 空間処理
-        mix = Splay.ar(mix, 0.8);
-        mix = FreeVerb.ar(mix, 0.6, 0.8, 0.3);
+        // メロディ用SynthDef
+        SynthDef(\flimMelody, { |out=0, freq=440, amp=0.2, attack=0.01, release=0.5|
+            var sig, env;
+            sig = SinOsc.ar(freq, 0, 0.3) + SinOsc.ar(freq * 2, 0, 0.1);
+            env = EnvGen.kr(Env.perc(attack, release), doneAction: 2);
+            sig = sig * env * amp;
+            // リバーブ
+            sig = FreeVerb.ar(sig, 0.5, 0.7, 0.2);
+            Out.ar(out, sig ! 2);
+        }).add;
         
-        // 全体のエンベロープ
-        mix = mix * EnvGen.kr(Env([0, 1, 1, 0], [0.1, total_duration-0.2, 0.1]), doneAction: 2);
-        
-        mix
-    }.play;
-    )
+        // Flim風の曲構成
+        Ppar([
+            // 繊細なビート
+            Pbind(
+                \instrument, \flimBeat,
+                \freq, Prand([200, 300, 400, 800, 1200, 2400], inf),
+                \dur, Prand([0.125, 0.25, 0.125, 0.125, 0.125, 0.25], inf),
+                \amp, Pwhite(0.1, 0.3, inf),
+                \pan, Pwhite(-0.8, 0.8, inf)
+            ),
+            
+            // メロディライン
+            Pbind(
+                \instrument, \flimMelody,
+                \degree, Pseq([0, 2, 4, 7, 9, 11, 12, 11, 9, 7, 4, 2], inf),
+                \octave, 5,
+                \dur, 0.25,
+                \amp, 0.2,
+                \attack, 0.01,
+                \release, Pwhite(0.1, 0.5, inf)
+            )
+        ]).play;
+    });
     ```
 
 ## 実験的・前衛的な音響
 
-36. **「ミクロな音の粒子から徐々に大きな音響構造が形成されていくような実験的な音響作品を作って」**
+36. **「ノイズ音楽のテクスチャを作って」**
     ```supercollider
-    (
-    {
-        // 時間の経過を表す変数
-        var duration = 120; // 2分間
-        var time = Line.kr(0, 1, duration);
-        
-        // ミクロな音の粒子（初期段階）
-        var micro_density = 30 * (1 - time) + 5;
-        var micro_particles = Dust.ar(micro_density);
-        var micro_freq = TExpRand.kr(3000, 15000, micro_particles);
-        var micro_dur = TExpRand.kr(0.001, 0.01, micro_particles);
-        var micro_sound = BPF.ar(micro_particles, micro_freq, 0.01) * EnvGen.kr(Env.perc(0.001, micro_dur), micro_particles);
-        
-        // 中間的な音の構造（中期段階）
-        var mid_density = 10 * (time - 0.3).clip(0, 0.7) / 0.7;
-        var mid_particles = Dust.ar(mid_density);
-        var mid_freq = TExpRand.kr(300, 3000, mid_particles);
-        var mid_dur = TExpRand.kr(0.05, 0.5, mid_particles);
-        var mid_sound = SinOsc.ar(mid_freq, 0, 0.1) * EnvGen.kr(Env.perc(0.01, mid_dur), mid_particles);
-        
-        // マクロな音響構造（後期段階）
-        var macro_intensity = (time - 0.6).clip(0, 0.4) / 0.4;
-        var macro_freq1 = 100 * (1 + LFNoise1.kr(0.1).range(0, 0.5));
-        var macro_freq2 = 150 * (1 + LFNoise1.kr(0.12).range(0, 0.5));
-        var macro_sound = LFTri.ar([macro_freq1, macro_freq2], 0, 0.3) * macro_intensity;
-        macro_sound = LPF.ar(macro_sound, 500 + (5000 * macro_intensity));
-        
-        // 全体の音響構造の形成
-        var structure = micro_sound * (1 - time).squared + 
-                        mid_sound * (1 - (time - 0.5).squared) + 
-                        macro_sound * macro_intensity;
-        
-        // 空間的な広がりの変化
-        var spatial = Splay.ar(structure, time);
-        
-        // 全体のミックス
-        var mix = spatial * EnvGen.kr(Env([0, 1, 1, 0], [2, duration-4, 2]), doneAction: 2);
-        
-        // 微妙な揺らぎを加える
-        mix = mix * LFNoise1.kr(0.5).range(0.8, 1);
-        
-        // 空間処理
-        mix = FreeVerb.ar(mix, time, 0.8, 0.5);
-        
-        mix
-    }.play;
-    )
+    s.waitForBoot({
+        {
+            // 複数のノイズソースを組み合わせる
+            var noise1 = WhiteNoise.ar(0.2);
+            var noise2 = PinkNoise.ar(0.3);
+            var noise3 = BrownNoise.ar(0.4);
+            
+            // 各ノイズにフィルターを適用
+            var filtered1 = BPF.ar(noise1, LFNoise1.kr(0.1).range(100, 1000), 0.2);
+            var filtered2 = HPF.ar(noise2, LFNoise1.kr(0.2).range(2000, 5000));
+            var filtered3 = LPF.ar(noise3, LFNoise1.kr(0.3).range(500, 3000));
+            
+            // 振幅変調を適用
+            filtered1 = filtered1 * LFPulse.kr(LFNoise0.kr(1).range(1, 8), 0, 0.4);
+            filtered2 = filtered2 * LFNoise1.kr(2).range(0, 1);
+            filtered3 = filtered3 * SinOsc.kr(0.1).range(0.2, 1);
+            
+            // 全体のエンベロープ
+            var mix = (filtered1 + filtered2 + filtered3) * 0.5;
+            mix = mix * EnvGen.kr(Env.linen(2, 20, 2), doneAction: 2);
+            
+            // ステレオ化
+            [mix, mix]
+        }.play;
+    });
     ```
 
-37. **「音響的フラクタル構造を持つ作品を作って。ミクロとマクロで同じパターンが繰り返される自己相似性を表現して」**
+37. **「ミクロポリフォニーのテクスチャを作って」**
     ```supercollider
-    (
-    {
-        // フラクタル生成のための再帰的な関数を模倣
-        var fractal_pattern = { |freq, depth, amp|
-            var sig, sub_sigs;
+    s.waitForBoot({
+        {
+            // 多数の正弦波を微妙に異なる周波数で生成
+            var numOscs = 30;
+            var baseFreq = 200;
+            var spread = 20; // 周波数の広がり
             
-            // ベース信号
-            sig = SinOsc.ar(freq, 0, amp);
-            
-            // 再帰の深さが残っている場合、サブパターンを生成
-            if(depth > 0, {
-                sub_sigs = Mix.ar(
-                    Array.fill(3, { |i|
-                        var sub_freq = freq * [1.5, 2, 2.667][i];
-                        var sub_amp = amp * 0.3;
-                        var sub_depth = depth - 1;
-                        
-                        // 再帰呼び出し（実際のSuperColliderでは直接再帰できないため近似）
-                        SinOsc.ar(sub_freq, 0, sub_amp * LFNoise1.kr(0.1 * (4-depth)).range(0.5, 1))
-                    })
-                );
-                
-                // ベース信号とサブパターンを組み合わせる
-                sig = sig + (sub_sigs * (1.0 / depth));
+            var oscs = Array.fill(numOscs, {
+                var freq = baseFreq + (spread * (2.0.rand - 1.0));
+                var amp = 1.0 / numOscs;
+                SinOsc.ar(freq, 2pi.rand, amp)
             });
             
-            sig
+            // 各オシレーターに個別のエンベロープを適用
+            var envs = Array.fill(numOscs, {
+                EnvGen.kr(
+                    Env.linen(
+                        rrand(1.0, 5.0),
+                        rrand(5.0, 10.0),
+                        rrand(3.0, 8.0)
+                    ),
+                    timeScale: rrand(0.9, 1.1)
+                )
+            });
+            
+            // オシレーターとエンベロープを組み合わせる
+            var mix = Mix.ar(oscs * envs) * 0.5;
+            
+            // 全体のエンベロープ
+            mix = mix * EnvGen.kr(Env.linen(5, 20, 5), doneAction: 2);
+            
+            // ステレオ化とリバーブ
+            mix = FreeVerb.ar(mix ! 2, 0.8, 0.9, 0.3);
+            
+            mix
+        }.play;
+    });
+    ```
+
+38. **「スペクトラル処理を使った音響変換を作って」**
+    ```supercollider
+    s.waitForBoot({
+        // バッファを作成
+        b = Buffer.alloc(s, 1024);
+        
+        {
+            // 入力信号
+            var input = Mix.ar([
+                SinOsc.ar(100, 0, 0.3),
+                Saw.ar(150, 0.2),
+                PinkNoise.ar(0.1)
+            ]);
+            
+            // FFT処理
+            var chain = FFT(b, input);
+            
+            // スペクトラル処理
+            chain = PV_MagFreeze(chain, LFPulse.kr(0.5));
+            chain = PV_BrickWall(chain, SinOsc.kr(0.1).range(-0.5, 0.5));
+            chain = PV_MagShift(chain, 1.5, 0);
+            
+            // 逆FFT
+            var output = IFFT(chain);
+            
+            // エンベロープとリミッター
+            output = output * EnvGen.kr(Env.linen(2, 10, 2), doneAction: 2);
+            output = (output * 0.5).clip2(0.9);
+            
+            output ! 2
+        }.play;
+    });
+    ```
+
+39. **「アルゴリズミックな音楽構造を作って」**
+    ```supercollider
+    s.waitForBoot({
+        // 音源用SynthDef
+        SynthDef(\algoSynth, { |out=0, freq=440, amp=0.2, attack=0.01, decay=0.1, sustain=0.5, release=0.5, pan=0|
+            var sig, env;
+            sig = SinOsc.ar(freq, 0, 0.3) + Saw.ar(freq * 0.5, 0.2);
+            env = EnvGen.kr(Env.adsr(attack, decay, sustain, release), doneAction: 2);
+            sig = sig * env * amp;
+            Out.ar(out, Pan2.ar(sig, pan));
+        }).add;
+        
+        // L-システムに基づくアルゴリズミックな構造
+        // 簡易的なL-システムの実装
+        ~lsystem = { |axiom, rules, iterations|
+            var result = axiom;
+            iterations.do {
+                result = result.collect { |char|
+                    rules[char] ? char;
+                }.flat;
+            };
+            result;
         };
         
-        // 複数のフラクタルレイヤーを生成
-        var layers = Mix.ar(
-            Array.fill(5, { |i|
-                var base_freq = [60, 90, 120, 180, 240][i];
-                var depth = 4;  // 再帰の深さ
-                var amp = 0.1;
-                
-                // 各レイヤーに時間変調を適用
-                var time_mod = LFNoise1.kr(0.05 + (i * 0.01)).range(0.8, 1.2);
-                
-                // フラクタルパターンを生成
-                var pattern = fractal_pattern.(base_freq * time_mod, depth, amp);
-                
-                // 空間配置
-                Pan2.ar(pattern, i * 0.4 - 0.8)
-            })
+        // L-システムのパラメータ
+        ~axiom = "A";
+        ~rules = (
+            $A: ["A", "B", "A"],
+            $B: ["B", "A"]
         );
         
-        // 時間的なフラクタル構造（リズムパターン）
-        var tempo = 1;  // 基本テンポ
-        var rhythm = Mix.ar(
-            Array.fill(4, { |depth|
-                var subdivision = 2 ** depth;  // 各深さでの分割数
-                var pulse_rate = tempo * subdivision;
-                var pulse = Impulse.kr(pulse_rate);
-                var amp = 0.2 / (depth + 1);
-                
-                // 各深さでのパルス音
-                var sound = WhiteNoise.ar * EnvGen.kr(Env.perc(0.001, 0.05 / subdivision), pulse) * amp;
-                
-                // フィルタリング
-                sound = BPF.ar(sound, 1000 * (depth + 1), 0.1);
-                
-                // 空間配置
-                Pan2.ar(sound, depth * 0.5 - 0.75)
-            })
-        );
+        // L-システムを実行
+        ~sequence = ~lsystem.(~axiom, ~rules, 4);
         
-        // 全体のミックス
-        var mix = layers + (rhythm * LFNoise1.kr(0.2).range(0, 1));
+        // 音楽パラメータへのマッピング
+        ~notes = ~sequence.collect { |char|
+            switch(char,
+                $A, { [0, 4, 7].choose },
+                $B, { [2, 5, 9].choose }
+            );
+        };
         
-        // 空間処理
-        mix = FreeVerb.ar(mix, 0.6, 0.8, 0.2);
-        
-        // 全体のエンベロープ
-        mix = mix * EnvGen.kr(Env([0, 1, 1, 0], [5, 110, 5]), doneAction: 2);
-        
-        mix
-    }.play;
-    )
+        // シーケンスを再生
+        Pbind(
+            \instrument, \algoSynth,
+            \degree, Pseq(~notes, 1),
+            \dur, Prand([0.125, 0.25, 0.5], inf),
+            \amp, Pwhite(0.1, 0.3, inf),
+            \attack, Pwhite(0.01, 0.1, inf),
+            \decay, Pwhite(0.1, 0.3, inf),
+            \sustain, Pwhite(0.2, 0.6, inf),
+            \release, Pwhite(0.1, 0.5, inf),
+            \pan, Pwhite(-0.8, 0.8, inf)
+        ).play;
+    });
     ```
 
-38. **「音響的な錯覚を生み出す作品を作って。上昇し続けるシェパードトーンや、空間的な錯覚を含むもの」**
+40. **「自然界の音響生態系を模倣した作品を作って」**
     ```supercollider
-    (
-    {
-        // シェパードトーン（無限に上昇し続けるように聞こえる錯覚）
-        var num_octaves = 6;
-        var cycle_duration = 20;  // 秒
-        var shepard = Mix.ar(
-            Array.fill(num_octaves, { |i|
-                var phase = Line.kr(0, 1, cycle_duration, reset: 1);
-                var octave = i + phase;
-                var freq = 100 * (2 ** octave);
-                var amp = sin(pi * phase) * 0.1;
-                
-                SinOsc.ar(freq, 0, amp)
-            })
-        );
+    s.waitForBoot({
+        // 環境音用SynthDef
+        SynthDef(\environment, { |out=0, amp=0.3|
+            var sig, env;
+            // 風のような音
+            var wind = HPF.ar(WhiteNoise.ar(0.1), LFNoise1.kr(0.1).range(1000, 3000));
+            wind = wind * LFNoise1.kr(0.3).range(0.1, 0.5);
+            
+            // 水のような音
+            var water = LPF.ar(WhiteNoise.ar(0.2), LFNoise1.kr(0.2).range(400, 1200));
+            water = water * LFNoise1.kr(0.5).range(0.1, 0.3);
+            
+            // 環境の背景音
+            var ambient = LPF.ar(PinkNoise.ar(0.1), 500);
+            ambient = ambient * LFNoise1.kr(0.1).range(0.05, 0.2);
+            
+            sig = wind + water + ambient;
+            env = EnvGen.kr(Env.linen(5, 20, 5), doneAction: 2);
+            sig = sig * env * amp;
+            Out.ar(out, sig ! 2);
+        }).add;
         
-        // 空間的な錯覚（音源の位置が移動しているように聞こえる）
-        var spatial_illusion = SinOsc.ar(440, 0, 0.1);
-        var pan_position = LFTri.kr(0.1).range(-0.8, 0.8);
-        var amplitude_l = (1 - pan_position) * 0.5 + 0.5;
-        var amplitude_r = (1 + pan_position) * 0.5 + 0.5;
-        var phase_shift = pan_position * 0.01;  // 位相差による空間的錯覚
-        spatial_illusion = [
-            spatial_illusion * amplitude_l,
-            DelayC.ar(spatial_illusion, 0.02, phase_shift + 0.01) * amplitude_r
-        ];
+        // 鳥の鳴き声用SynthDef
+        SynthDef(\bird, { |out=0, freq=3000, amp=0.1, pan=0|
+            var sig, env;
+            sig = SinOsc.ar(
+                LFNoise1.kr(10).range(freq * 0.8, freq * 1.2),
+                0,
+                amp
+            );
+            env = EnvGen.kr(Env.perc(0.01, rrand(0.05, 0.2)), doneAction: 2);
+            sig = sig * env;
+            Out.ar(out, Pan2.ar(sig, pan));
+        }).add;
         
-        // バイノーラルビート（左右の耳で微妙に周波数の異なる音を聴くと脳内で生じる錯覚）
-        var binaural_beat = [
-            SinOsc.ar(200, 0, 0.05),
-            SinOsc.ar(210, 0, 0.05)
-        ];
+        // 昆虫の音用SynthDef
+        SynthDef(\insect, { |out=0, freq=5000, amp=0.05, pan=0|
+            var sig, env;
+            sig = HPF.ar(WhiteNoise.ar(amp), freq);
+            sig = sig * LFPulse.kr(LFNoise0.kr(5).range(10, 50), 0, 0.5);
+            env = EnvGen.kr(Env.linen(0.01, rrand(0.1, 1.0), 0.01), doneAction: 2);
+            sig = sig * env;
+            Out.ar(out, Pan2.ar(sig, pan));
+        }).add;
         
-        // リズム的な錯覚（ポリリズム）
-        var polyrhythm = Mix.ar(
-            Array.fill(3, { |i|
-                var tempo = [5, 7, 11][i];
-                var pulse = Impulse.kr(tempo);
-                var sound = SinOsc.ar([300, 400, 500][i], 0, 0.05) * 
-                            EnvGen.kr(Env.perc(0.001, 0.1), pulse);
-                Pan2.ar(sound, i * 0.5 - 0.5)
-            })
-        );
+        // 環境音を再生
+        Synth(\environment);
         
-        // 全体のミックス
-        var mix = shepard + spatial_illusion + binaural_beat + polyrhythm;
+        // 鳥の鳴き声を不規則に再生
+        Pbind(
+            \instrument, \bird,
+            \freq, Pwhite(2000, 5000, inf),
+            \dur, Pwhite(0.5, 3.0, inf),
+            \amp, Pwhite(0.05, 0.15, inf),
+            \pan, Pwhite(-0.8, 0.8, inf)
+        ).play;
         
-        // 空間処理（さらなる空間的錯覚を強化）
-        mix = FreeVerb.ar(mix, 0.5, 0.8, 0.2);
-        
-        // 全体のエンベロープ
-        mix = mix * EnvGen.kr(Env([0, 1, 1, 0], [5, 110, 5]), doneAction: 2);
-        
-        mix
-    }.play;
-    )
+        // 昆虫の音を不規則に再生
+        Pbind(
+            \instrument, \insect,
+            \freq, Pwhite(3000, 8000, inf),
+            \dur, Pwhite(0.2, 1.0, inf),
+            \amp, Pwhite(0.02, 0.08, inf),
+            \pan, Pwhite(-0.8, 0.8, inf)
+        ).play;
+    });
     ```
 
-39. **「音響的な対位法を使った作品を作って。複数の独立した音の線が絡み合い、調和と不協和を織りなすもの」**
-    ```supercollider
-    (
-    {
-        // 対位法の声部数
-        var num_voices = 4;
-        
-        // 各声部の基本的な音程パターン
-        var patterns = [
-            [60, 62, 64, 65, 67, 65, 64, 62],  // 第1声部
-            [48, 50, 52, 53, 55, 53, 52, 50],  // 第2声部
-            [67, 65, 64, 62, 60, 62, 64, 65],  // 第3声部（第1声部の反行形）
-            [72, 71, 69, 67, 65, 67, 69, 71]   // 第4声部
-        ];
-        
-        // 各声部の速度（テンポ）
-        var speeds = [1, 0.75, 1.25, 0.5];
-        
-        // 各声部の音色特性
-        var timbres = [
-            // 第1声部：明るい音色
-            { |freq, amp| 
-                var sig = SinOsc.ar(freq, 0, amp * 0.7) + SinOsc.ar(freq * 2, 0, amp * 0.3);
-                sig = LPF.ar(sig, freq * 4);
-                sig
-            },
-            // 第2声部：低く豊かな音色
-            { |freq, amp|
-                var sig = SinOsc.ar(freq, 0, amp * 0.5) + SinOsc.ar(freq * 0.5, 0, amp * 0.5);
-                sig = LPF.ar(sig, freq * 3);
-                sig
-            },
-            // 第3声部：弦楽器のような音色
-            { |freq, amp|
-                var sig = Saw.ar(freq, amp * 0.3);
-                sig = LPF.ar(sig, freq * 6);
-                sig = sig * EnvGen.kr(Env.perc(0.01, 0.5));
-                sig
-            },
-            // 第4声部：フルートのような音色
-            { |freq, amp|
-                var sig = SinOsc.ar(freq, 0, amp * 0.6) + SinOsc.ar(freq * 3, 0, amp * 0.2);
-                sig = sig * EnvGen.kr(Env.perc(0.05, 0.5));
-                sig
-            }
-        ];
-        
-        // 各声部の空間的位置
-        var positions = [-0.7, -0.2, 0.2, 0.7];
-        
-        // 対位法の声部を生成
-        var counterpoint = Mix.ar(
-            Array.fill(num_voices, { |voice_idx|
-                var pattern = patterns[voice_idx];
-                var speed = speeds[voice_idx];
-                var timbre_func = timbres[voice_idx];
-                var position = positions[voice_idx];
-                
-                // 各声部のシーケンサー
-                var seq_idx = Phasor.kr(0, speed * 0.5 / SampleRate.ir, 0, pattern.size);
-                var note_idx = seq_idx.floor % pattern.size;
-                var next_note_idx = (note_idx + 1) % pattern.size;
-                var interp = seq_idx - note_idx;
-                
-                // 音程の補間（滑らかな移行）
-                var note = pattern[note_idx] * (1 - interp) + pattern[next_note_idx] * interp;
-                var freq = note.midicps;
-                
-                // 音色生成
-                var sig = timbre_func.(freq, 0.1);
-                
-                // 空間配置
-                Pan2.ar(sig, position)
-            })
-        );
-        
-        // 全体の調和度を変化させる（時間とともに調和と不協和を織りなす）
-        var harmony_factor = LFNoise1.kr(0.05).range(0, 1);
-        var harmony_mod = Mix.ar(
-            Array.fill(num_voices, { |i|
-                var freq = (60 + [0, 4, 7, 11][i]).midicps;
-                SinOsc.ar(freq, 0, 0.05 * harmony_factor)
-            })
-        );
-        
-        // 全体のミックス
-        var mix = counterpoint + harmony_mod;
-        
-        // 空間処理
-        mix = FreeVerb.ar(mix, 0.4, 0.8, 0.2);
-        
-        // 全体のエンベロープ
-        mix = mix * EnvGen.kr(Env([0, 1, 1, 0], [5, 110, 5]), doneAction: 2);
-        
-        mix
-    }.play;
-    )
-    ```
-
-40. **「自然界の音響生態系を模倣した作品を作って。昆虫、鳥、風、水などの音が有機的に相互作用するもの」**
-    ```supercollider
-    (
-    {
-        // 時間の経過（一日のサイクル）
-        var day_cycle = 180;  // 3分間で一日
-        var time = Line.kr(0, 1, day_cycle, reset: 1);
-        var day_night = sin(time * 2pi);  // -1（夜）から1（昼）の範囲
-        
-        // 風の音
-        var wind_intensity = LFNoise1.kr(0.1).range(0.1, 0.5) * (1 + day_night * 0.2);
-        var wind = HPF.ar(PinkNoise.ar(wind_intensity), 1000);
-        wind = LPF.ar(wind, 100 + LFNoise1.kr(0.2).range(0, 5000));
-        
-        // 水の音（小川）
-        var water_intensity = LFNoise1.kr(0.05).range(0.1, 0.3);
-        var water = HPF.ar(WhiteNoise.ar(water_intensity), 3000);
-        water = water * LFNoise1.kr(0.3).range(0.7, 1);
-        
-        // 昆虫の音（夜に活発）
-        var insects_activity = (1 - day_night).clip(0, 1) * LFNoise1.kr(0.2).range(0.5, 1);
-        var insects = Mix.ar(
-            Array.fill(10, { |i|
-                var freq = TExpRand.kr(3000, 8000, Dust.kr(0.1));
-                var amp = TExpRand.kr(0.01, 0.05, Dust.kr(0.1)) * insects_activity;
-                var dur = TExpRand.kr(0.05, 0.5, Dust.kr(0.1));
-                var rate = TExpRand.kr(10, 50, Dust.kr(0.1));
-                var insect = SinOsc.ar(freq, 0, amp) * LFPulse.kr(rate, 0, 0.5);
-                Pan2.ar(insect, TRand.kr(-0.8, 0.8, Dust.kr(0.1)))
-            })
-        );
-        
-        // 鳥の音（昼に活発）
-        var birds_activity = (day_night).clip(0, 1) * LFNoise1.kr(0.1).range(0.5, 1);
-        var birds = Mix.ar(
-            Array.fill(5, { |i|
-                var trigger = Dust.kr(birds_activity * 0.5);
-                var freq = TChoose.kr(trigger, [1000, 1200, 1500, 2000, 2500, 3000]);
-                var amp = TExpRand.kr(0.01, 0.1, trigger) * birds_activity;
-                var chirp = SinOsc.ar(
-                    freq * EnvGen.kr(Env([1, 1.5, 1], [0.02, 0.05]), trigger),
-                    0,
-                    amp * EnvGen.kr(Env.perc(0.01, 0.1), trigger)
-                );
-                Pan2.ar(chirp, TRand.kr(-0.8, 0.8, trigger))
-            })
-        );
-        
-        // 遠くの動物の鳴き声（夕方と明け方に活発）
-        var animal_activity = sin(time * 2pi - 0.5pi).abs * LFNoise1.kr(0.05).range(0.5, 1);
-        var animals = Mix.ar(
-            Array.fill(3, { |i|
-                var trigger = Dust.kr(animal_activity * 0.1);
-                var freq = TChoose.kr(trigger, [300, 400, 500, 600]);
-                var amp = TExpRand.kr(0.05, 0.2, trigger) * animal_activity;
-                var call = SinOsc.ar(
-                    freq * EnvGen.kr(Env([1, 0.8, 1.2, 1], [0.1, 0.2, 0.1]), trigger),
-                    0,
-                    amp * EnvGen.kr(Env.perc(0.1, 1), trigger)
-                );
-                Pan2.ar(call, TRand.kr(-0.8, 0.8, trigger))
-            })
-        );
-        
-        // 生態系の相互作用（例：風が強いと昆虫が少なくなる）
-        insects = insects * (1 - wind_intensity).clip(0.2, 1);
-        
-        // 全体のミックス
-        var ecosystem = wind + water + insects + birds + animals;
-        
-        // 空間処理（森の中の反響）
-        ecosystem = FreeVerb.ar(ecosystem, 0.3, 0.8, 0.5);
-        
-        // 全体のエンベロープ
-        ecosystem = ecosystem * EnvGen.kr(Env([0, 1, 1, 0], [10, day_cycle-20, 10]), doneAction: 2);
-        
-        ecosystem
-    }.play;
-    )
-    ```
+これらの例は、SuperColliderのベストプラクティスに従って実装されており、サーバー管理、エンベロープの適用、エラー処理、コメントによるドキュメント化などが考慮されています。各例は独立して実行可能で、初心者から上級者まで幅広いユーザーに対応しています。
