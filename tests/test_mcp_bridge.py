@@ -152,7 +152,9 @@ class TestResponseGenerator(unittest.TestCase):
         code = "var sig = SinOsc.ar(440);"
         formatted = self.generator.format_code_for_claude(code)
         
-        self.assertEqual(formatted, "```supercollider\nvar sig = SinOsc.ar(440);\n```")
+        self.assertEqual(formatted, "```supercollider\
+var sig = SinOsc.ar(440);\
+```")
 
 
 class TestMCPServerIntegration(AioHTTPTestCase):

@@ -104,7 +104,9 @@ class ResponseGenerator:
         Returns:
             str: The formatted code
         """
-        return f"```{language}\n{code}\n```"
+        return f"```{language}\
+{code}\
+```"
     
     def format_audio_response(self, audio_url, description=None):
         """
