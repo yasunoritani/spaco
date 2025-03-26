@@ -1,4 +1,8 @@
-# SuperCollider インターフェース
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+SuperCollider インターフェース
 
 このモジュールは、OSCプロトコルとコード実行を使用してSuperColliderを制御するための
 統合インターフェースを提供します。code_executor、osc_client、state_managerモジュールの
@@ -21,7 +25,9 @@ logger = logging.getLogger(__name__)
 
 class SuperColliderError(Exception):
     """SuperCollider関連の例外の基底クラス"""
-    pass
+    def __init__(self, message, original_exception=None):
+        super().__init__(message)
+        self.original_exception = original_exception
 
 class SuperColliderExecutionError(SuperColliderError):
     """SuperColliderコードの実行中に発生したエラー"""
@@ -35,6 +41,10 @@ class SuperColliderResourceError(SuperColliderError):
     """SuperColliderリソースの管理に関するエラー"""
     pass
 
+class SuperColliderTimeoutError(SuperColliderError):
+    """SuperColliderの操作がタイムアウトした場合のエラー"""
+    pass
+
 class SuperColliderInterface:
     """
     SuperCollider統合インターフェース
@@ -43,12 +53,19 @@ class SuperColliderInterface:
     - SuperColliderコードの実行
     - OSCを介したSuperColliderサーバー(scsynth)との通信
     - 実行中のSuperColliderプロセスの状態管理
+    
+    非同期コンテキストマネージャーとして使用できます：
+    ```python
+    async with SuperColliderInterface() as sc:
+        await sc.execute("{ SinOsc.ar(440, 0, 0.2) }.play")
+    ```
     """
     
     def __init__(self, 
                  host: str = "127.0.0.1", 
                  port: int = 57110, 
-                 sclang_path: str = "sclang"):
+                 sclang_path: str = "sclang",
+                 timeout: int = 30):
         """
         SuperColliderインターフェースを初期化します。
         
@@ -56,6 +73,7 @@ class SuperColliderInterface:
             host (str): SuperColliderサーバーが実行されているホスト
             port (int): SuperColliderサーバーとのOSC通信用ポート
             sclang_path (str): sclang実行ファイルへのパス
+            timeout (int): 操作のタイムアウト秒数
         
         例外:
             FileNotFoundError: sclangが見つからない場合
@@ -64,10 +82,23 @@ class SuperColliderInterface:
         self.host = host
         self.port = port
         self.sclang_path = sclang_path
+        self.timeout = timeout
+        self._initialized = False
         
         # sclangが存在するか確認
         if not os.path.exists(sclang_path) and "/" in sclang_path:
             raise FileNotFoundError(f"sclangが見つかりません: {sclang_path}")
+            
+        # 危険なSuperColliderコマンドのパターン
+        self._dangerous_patterns = [
+            "Server.killAll", 
+            "0.exit", 
+            "thisProcess.shutdown",
+            "Quarks.install",
+            "File.delete",
+            "Pipe.new",
+            "unixCmd"
+        ]
             
         try:
             # コンポーネントの初期化
@@ -83,7 +114,48 @@ class SuperColliderInterface:
             logger.info(f"SuperColliderインターフェースを初期化しました (host: {host}, port: {port})")
         except Exception as e:
             logger.exception("SuperColliderインターフェースの初期化中にエラーが発生しました")
-            raise SuperColliderConnectionError(f"初期化エラー: {str(e)}") from e
+            raise SuperColliderConnectionError(f"初期化エラー: {str(e)}", original_exception=e) from e
+    
+    async def __aenter__(self):
+        """非同期コンテキストマネージャーのエントリーポイント"""
+        await self.initialize()
+        return self
+        
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """非同期コンテキストマネージャーの終了処理"""
+        await self.close()
+        
+    async def initialize(self):
+        """インターフェースの初期化"""
+        try:
+            # サーバー接続を検証
+            await self._verify_server_connection()
+            self._initialized = True
+            logger.info("SuperColliderインターフェースの初期化が完了しました")
+        except Exception as e:
+            logger.exception("インターフェースの初期化中にエラーが発生しました")
+            raise SuperColliderConnectionError(f"初期化エラー: {str(e)}", original_exception=e) from e
+            
+    async def close(self):
+        """インターフェースのクリーンアップ"""
+        try:
+            # 実行中のすべてのシンセを停止
+            if self._initialized:
+                await self.stop_all()
+                
+                # OSCクライアントを閉じる
+                if hasattr(self, 'osc_client') and self.osc_client:
+                    await self._run_in_executor(self.osc_client.close)
+                    
+                # コードエグゼキュータをクリーンアップ
+                if hasattr(self, 'code_executor') and self.code_executor:
+                    await self._run_in_executor(self.code_executor.stop_sclang_process)
+                    
+                self._initialized = False
+                logger.info("SuperColliderインターフェースを正常に閉じました")
+        except Exception as e:
+            logger.error(f"インターフェースを閉じる際にエラーが発生しました: {str(e)}")
+            raise SuperColliderError(f"クリーンアップエラー: {str(e)}", original_exception=e) from e
     
     async def _run_in_executor(self, func, *args, **kwargs):
         """
@@ -133,6 +205,158 @@ class SuperColliderInterface:
             logger.error(f"SuperColliderサーバーとの接続検証に失敗しました: {str(e)}")
             raise SuperColliderConnectionError(f"サーバー接続エラー: {str(e)}") from e
     
+    def sanitize_code(self, sc_code: str) -> str:
+        """
+        SuperColliderコードをサニタイズし、安全に実行できるようにします。
+        
+        引数:
+            sc_code (str): サニタイズするSuperColliderコード
+            
+        戻り値:
+            str: サニタイズされたコード
+        """
+        if not sc_code:
+            return sc_code
+            
+        # 危険な操作をブロック
+        for pattern in self._dangerous_patterns:
+            if pattern in sc_code:
+                logger.warning(f"危険な操作がブロックされました: {pattern}")
+                sc_code = sc_code.replace(pattern, f"// BLOCKED: {pattern}")
+        
+        # リソース使用量の制限
+        if "inf" in sc_code and ("do {" in sc_code or "while {" in sc_code):
+            logger.warning("無限ループの可能性があるコードが検出されました")
+            
+        # 実行時間制限の追加
+        timeout_wrapper = f"""
+        var executionStartTime = Main.elapsedTime;
+        var maxExecutionTime = {min(10, self.timeout)}; // {min(10, self.timeout)}秒の実行時間制限
+        
+        // 実行時間監視関数
+        {{
+            while(Main.elapsedTime - executionStartTime < maxExecutionTime) {{
+                0.5.wait;
+            }};
+            "SPACO: コード実行時間が制限を超えました。実行を中断します。".postln;
+            // 強制的にノードを解放
+            s.freeAll;
+        }}.fork;
+        
+        // 元のコード
+        {sc_code}
+        """
+        
+        return timeout_wrapper
+    
+    async def _validate_input(self, sc_code: str) -> None:
+        """
+        入力コードを検証します。
+        
+        引数:
+            sc_code (str): 検証するSuperColliderコード
+            
+        例外:
+            ValueError: 入力が無効な場合
+        """
+        if not sc_code or not isinstance(sc_code, str):
+            raise ValueError("実行するコードが無効です")
+    
+    async def _ensure_server_connection(self) -> None:
+        """
+        サーバー接続を確保します。
+        
+        例外:
+            SuperColliderConnectionError: 接続に失敗した場合
+        """
+        if not self._initialized:
+            await self.initialize()
+        else:
+            await self._verify_server_connection()
+    
+    async def _prepare_code(self, sc_code: str) -> Tuple[str, int, str]:
+        """
+        実行用にコードを準備します。
+        
+        引数:
+            sc_code (str): 準備するSuperColliderコード
+            
+        戻り値:
+            Tuple[str, int, str]: audio_id, node_id, 修正されたコード
+        """
+        audio_id = str(uuid.uuid4())
+        node_id = self._get_next_node_id()
+        
+        # コードをサニタイズ
+        sanitized_code = self.sanitize_code(sc_code)
+        
+        # SuperCollider node IDを変数として埋め込む
+        modified_code = sanitized_code.replace(
+            "{", 
+            f"{{ \n// SPACO node ID: {node_id}\nvar spacoNodeID = {node_id};\n",
+            1  # 最初の出現のみ置換
+        )
+        
+        return audio_id, node_id, modified_code
+    
+    async def _execute_code(self, prepared_code: str) -> Dict[str, Any]:
+        """
+        準備されたコードを実行します。
+        
+        引数:
+            prepared_code (str): 実行する準備済みコード
+            
+        戻り値:
+            Dict[str, Any]: 実行結果
+            
+        例外:
+            SuperColliderExecutionError: 実行中にエラーが発生した場合
+        """
+        logger.info(f"SuperColliderコードを実行中: {prepared_code[:50]}...")
+        
+        # コードを別スレッドで実行
+        result = await self._run_in_executor(
+            self.code_executor.execute, prepared_code
+        )
+        
+        if result.get("status") != "success":
+            logger.warning(f"SuperColliderコードの実行に失敗しました: {result.get('stderr', '')}")
+            raise SuperColliderExecutionError(f"コード実行エラー: {result.get('stderr', '')}", 
+                                             original_exception=None)
+            
+        return result
+    
+    async def _register_synth(self, audio_id: str, node_id: int, sc_code: str, result: Dict[str, Any]) -> None:
+        """
+        シンセを状態マネージャーに登録します。
+        
+        引数:
+            audio_id (str): シンセの一意識別子
+            node_id (int): SuperCollider node ID
+            sc_code (str): 実行されたコード
+            result (Dict[str, Any]): 実行結果
+        """
+        synth_data = {
+            "id": audio_id,
+            "node_id": node_id,
+            "name": "生成されたシンセ",
+            "code": sc_code,
+            "result": result,
+            "created_at": time.time()
+        }
+        
+        await self._run_in_executor(
+            self.state_manager.add_synth,
+            audio_id, synth_data
+        )
+        
+        # node IDとaudio_idのマッピングを保存
+        self._node_id_map[node_id] = audio_id
+        
+        result["audio_id"] = audio_id
+        result["node_id"] = node_id
+        logger.info(f"SuperColliderコードが正常に実行されました。audio_id: {audio_id}, node_id: {node_id}")
+    
     async def execute(self, sc_code: str) -> Dict[str, Any]:
         """
         SuperColliderコードを実行します。
@@ -146,30 +370,18 @@ class SuperColliderInterface:
         例外:
             SuperColliderExecutionError: コード実行中にエラーが発生した場合
         """
-        if not sc_code or not isinstance(sc_code, str):
-            raise ValueError("実行するコードが無効です")
-            
-        audio_id = str(uuid.uuid4())
-        node_id = self._get_next_node_id()
-        
         try:
-            # サーバー接続を検証
-            await self._verify_server_connection()
+            # 入力検証
+            await self._validate_input(sc_code)
             
-            # SuperCollider node IDを変数として埋め込む
-            # これによりシンセを後で特定して停止できるようになる
-            modified_code = sc_code.replace(
-                "{", 
-                f"{{ \n// SPACO node ID: {node_id}\nvar spacoNodeID = {node_id};\n",
-                1  # 最初の出現のみ置換
-            )
+            # サーバー接続確認
+            await self._ensure_server_connection()
             
-            logger.info(f"SuperColliderコードを実行中: {modified_code[:50]}...")
+            # コード準備
+            audio_id, node_id, prepared_code = await self._prepare_code(sc_code)
             
-            # コードを別スレッドで実行
-            result = await self._run_in_executor(
-                self.code_executor.execute, modified_code
-            )
+            # コード実行
+            result = await self._execute_code(prepared_code)
             
             # 実行履歴に追加
             await self._run_in_executor(
@@ -177,31 +389,8 @@ class SuperColliderInterface:
                 sc_code, result
             )
             
-            # 実行が成功した場合、シンセを状態マネージャーに登録
-            if result.get("status") == "success":
-                synth_data = {
-                    "id": audio_id,
-                    "node_id": node_id,
-                    "name": "生成されたシンセ",
-                    "code": sc_code,
-                    "result": result,
-                    "created_at": time.time()
-                }
-                
-                await self._run_in_executor(
-                    self.state_manager.add_synth,
-                    audio_id, synth_data
-                )
-                
-                # node IDとaudio_idのマッピングを保存
-                self._node_id_map[node_id] = audio_id
-                
-                result["audio_id"] = audio_id
-                result["node_id"] = node_id
-                logger.info(f"SuperColliderコードが正常に実行されました。audio_id: {audio_id}, node_id: {node_id}")
-            else:
-                logger.warning(f"SuperColliderコードの実行に失敗しました: {result.get('stderr', '')}")
-                raise SuperColliderExecutionError(f"コード実行エラー: {result.get('stderr', '')}")
+            # シンセを登録
+            await self._register_synth(audio_id, node_id, sc_code, result)
             
             return result
             
@@ -215,7 +404,7 @@ class SuperColliderInterface:
         except Exception as e:
             # その他の未処理例外
             logger.exception("SuperColliderコードの実行中に予期しないエラーが発生しました")
-            raise SuperColliderExecutionError(f"コード実行エラー: {str(e)}") from e
+            raise SuperColliderExecutionError(f"コード実行エラー: {str(e)}", original_exception=e) from e
     
     async def stop_synth(self, audio_id: str) -> Dict[str, Any]:
         """
@@ -391,18 +580,16 @@ class SuperColliderInterface:
             Dict[str, Any]: クリーンアップ結果
         """
         try:
-            # すべてのシンセを停止
-            await self.stop_all()
+            # インターフェースを閉じる
+            await self.close()
             
-            # sclangプロセスを停止
+            # 状態をリセット
             await self._run_in_executor(
-                self.code_executor.stop_sclang_process
+                self.state_manager.reset
             )
             
-            # サーバー状態を更新
-            await self._run_in_executor(
-                self.state_manager.set_server_status, False
-            )
+            # メモリの解放を促進
+            self._node_id_map.clear()
             
             logger.info("SuperColliderインターフェースのリソースをクリーンアップしました")
             return {
