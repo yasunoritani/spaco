@@ -1,0 +1,14 @@
+{
+  "generate_lowpass": {
+    "description": "特定の周波数より低い成分を通過させ、高い成分を減衰させるフィルターです。音色を柔らかくしたり、音の明るさを調整するのに使用します。",
+    "template": "s.waitForBoot({\n    {\n        // ノイズ源またはオシレーターを生成\n        var src = {source_type}.ar({source_param});\n        \n        // ローパスフィルターを適用\n        var sig = LPF.ar(src, {filter_freq});\n        \n        // エンベロープを適用\n        sig = sig * EnvGen.kr(Env.linen({attack}, {duration}, {release}), doneAction: 2);\n        \n        sig ! 2 // ステレオ出力\n    }.play;\n});"
+  },
+  "generate_highpass": {
+    "description": "特定の周波数より高い成分を通過させ、低い成分を減衰させるフィルターです。低域のノイズ除去や音の薄さを強調するのに使用します。",
+    "template": "s.waitForBoot({\n    {\n        // ノイズ源またはオシレーターを生成\n        var src = {source_type}.ar({source_param});\n        \n        // ハイパスフィルターを適用\n        var sig = HPF.ar(src, {filter_freq});\n        \n        // エンベロープを適用\n        sig = sig * EnvGen.kr(Env.linen({attack}, {duration}, {release}), doneAction: 2);\n        \n        sig ! 2 // ステレオ出力\n    }.play;\n});"
+  },
+  "generate_bandpass": {
+    "description": "特定の周波数帯域のみを通過させ、それ以外を減衰させるフィルターです。特定の帯域を強調したり、電話の音のような効果を作るのに使用します。",
+    "template": "s.waitForBoot({\n    {\n        // ノイズ源またはオシレーターを生成\n        var src = {source_type}.ar({source_param});\n        \n        // バンドパスフィルターを適用\n        var sig = BPF.ar(src, {filter_freq}, {q});\n        \n        // エンベロープを適用\n        sig = sig * EnvGen.kr(Env.linen({attack}, {duration}, {release}), doneAction: 2);\n        \n        sig ! 2 // ステレオ出力\n    }.play;\n});"
+  }
+}

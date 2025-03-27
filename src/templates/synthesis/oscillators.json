@@ -1,0 +1,18 @@
+{
+  "generate_sine": {
+    "description": "基本的な正弦波オシレーターを生成します。最も純粋な波形で、倍音を含まない単一の周波数成分で構成されています。",
+    "template": "s.waitForBoot({\n    {\n        // {freq}Hzの正弦波オシレーターを生成\n        var sig = SinOsc.ar({freq}, 0, {amp});\n        // エンベロープを適用してクリックノイズを防止\n        sig = sig * EnvGen.kr(Env.linen({attack}, {duration}, {release}), doneAction: 2);\n        sig ! 2 // ステレオ出力\n    }.play;\n});"
+  },
+  "generate_sawtooth": {
+    "description": "ノコギリ波オシレーターを生成します。倍音を多く含み、豊かな音色を持ちます。弦楽器のような音色や金管楽器の模倣にも使用されます。",
+    "template": "s.waitForBoot({\n    {\n        // {freq}Hzのノコギリ波を生成\n        var sig = Saw.ar({freq}, {amp});\n        // エンベロープを適用\n        sig = sig * EnvGen.kr(Env.linen({attack}, {duration}, {release}), doneAction: 2);\n        sig ! 2 // ステレオ出力\n    }.play;\n});"
+  },
+  "generate_square": {
+    "description": "矩形波（パルス波）オシレーターを生成します。デジタルな音色やレトロなゲーム音楽に特徴的な波形です。",
+    "template": "s.waitForBoot({\n    {\n        // {freq}Hzの矩形波を生成\n        var sig = Pulse.ar({freq}, {pulse_width}, {amp});\n        // エンベロープを適用\n        sig = sig * EnvGen.kr(Env.linen({attack}, {duration}, {release}), doneAction: 2);\n        sig ! 2 // ステレオ出力\n    }.play;\n});"
+  },
+  "generate_triangle": {
+    "description": "三角波オシレーターを生成します。ノコギリ波や矩形波に比べて倍音が少なく、柔らかい音色を持ちます。",
+    "template": "s.waitForBoot({\n    {\n        // {freq}Hzの三角波を生成（LFTriを使用）\n        var sig = LFTri.ar({freq}, 0, {amp});\n        // エンベロープを適用\n        sig = sig * EnvGen.kr(Env.linen({attack}, {duration}, {release}), doneAction: 2);\n        sig ! 2 // ステレオ出力\n    }.play;\n});"
+  }
+}

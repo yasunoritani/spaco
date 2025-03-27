@@ -1,0 +1,10 @@
+{
+  "generate_metal": {
+    "description": "金属的な音色を生成します。Klankを使用して複雑な倍音構造を作成します。",
+    "template": "s.waitForBoot({\n    {\n        // Klankを使用して金属的な倍音構造を作成\n        var freqs = {freq_ratios} * {freq};\n        var amps = {amp_ratios} * {amp};\n        var rings = {ring_ratios} * {duration};\n        var sig = Klank.ar(`[freqs, amps, rings], Impulse.ar({impulse_freq}, 0, {impulse_amp}));\n        // パーカッシブなエンベロープを適用\n        sig = sig * EnvGen.kr(Env.perc({attack}, {duration}), doneAction: 2);\n        sig ! 2 // ステレオ出力\n    }.play;\n});"
+  },
+  "generate_noise": {
+    "description": "様々な種類のノイズを生成します。環境音や特殊効果、テクスチャーの作成に使用します。",
+    "template": "s.waitForBoot({\n    {\n        // ノイズを生成（WhiteNoise, PinkNoise, BrownNoiseから選択）\n        var sig = {noise_type}.ar({amp});\n        \n        // フィルターを適用して音色を調整\n        sig = BPF.ar(sig, {freq}, {q});\n        \n        // エンベロープを適用\n        sig = sig * EnvGen.kr(Env.linen({attack}, {duration}, {release}), doneAction: 2);\n        \n        sig ! 2 // ステレオ出力\n    }.play;\n});"
+  }
+}
