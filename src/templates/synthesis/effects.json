@@ -1,0 +1,14 @@
+{
+  "generate_reverb": {
+    "description": "音に残響効果を追加します。空間の広がりや距離感を表現するのに使用します。",
+    "template": "s.waitForBoot({\n    {\n        // 基本的な音源を生成\n        var src = {source_type}.ar({source_param});\n        src = src * EnvGen.kr(Env.linen({attack}, {src_duration}, {release}));\n        \n        // FreeVerbでリバーブを適用\n        var sig = FreeVerb.ar(\n            src,\n            mix: {reverb_mix},           // ドライ/ウェットミックス（0～1）\n            room: {reverb_size},         // 部屋の大きさ（0～1）\n            damp: {reverb_damp}          // 高周波減衰（0～1）\n        );\n        \n        // 全体的なエンベロープ\n        sig = sig * EnvGen.kr(Env.linen({attack}, {duration}, {reverb_tail}), doneAction: 2);\n        \n        sig ! 2 // ステレオ出力\n    }.play;\n});"
+  },
+  "generate_delay": {
+    "description": "音を遅延させてエコー効果を作成します。繰り返しやリズミカルな効果を作るのに使用します。",
+    "template": "s.waitForBoot({\n    {\n        // 基本的な音源を生成\n        var src = {source_type}.ar({source_param});\n        src = src * EnvGen.kr(Env.linen({attack}, {src_duration}, {release}));\n        \n        // ディレイを適用\n        var sig = CombN.ar(\n            src,\n            maxdelaytime: {max_delay_time},\n            delaytime: {delay_time},       // ディレイタイム（秒）\n            decaytime: {delay_feedback}    // フィードバック量\n        );\n        \n        // 全体的なエンベロープ\n        sig = sig * EnvGen.kr(Env.linen({attack}, {duration}, {delay_tail}), doneAction: 2);\n        \n        sig ! 2 // ステレオ出力\n    }.play;\n});"
+  },
+  "generate_distortion": {
+    "description": "音に歪みを加えます。ロックギターのような効果や音に荒さを加えるのに使用します。",
+    "template": "s.waitForBoot({\n    {\n        // 基本的な音源を生成\n        var src = {source_type}.ar({source_param});\n        \n        // ディストーションを適用\n        var sig = (src * {distortion_amount}).tanh;\n        \n        // エンベロープを適用\n        sig = sig * EnvGen.kr(Env.linen({attack}, {duration}, {release}), doneAction: 2);\n        \n        sig ! 2 // ステレオ出力\n    }.play;\n});"
+  }
+}

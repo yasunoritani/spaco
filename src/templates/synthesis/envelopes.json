@@ -1,0 +1,14 @@
+{
+  "generate_pad": {
+    "description": "複数の音源とゆっくりとしたエンベロープを組み合わせて、柔らかいパッドサウンドを生成します。シンセサイザーの典型的な持続音です。",
+    "template": "s.waitForBoot({\n    {\n        // デチューンした複数の正弦波を使用\n        var sig = SinOsc.ar([{freq}, {freq}*{detune_factor1}], 0, {amp}) + SinOsc.ar([{freq}*0.5, {freq}*0.5*{detune_factor2}], 0, {amp}*0.5);\n        // ローパスフィルターで高周波を削減\n        sig = LPF.ar(sig, {filter_freq});\n        // ADSRエンベロープで緩やかな立ち上がりと減衰を実現\n        sig = sig * EnvGen.kr(Env.adsr({attack}, {decay}, {sustain}, {release}), 1, doneAction: 2);\n        sig\n    }.play;\n});"
+  },
+  "generate_pluck": {
+    "description": "弦を弾いたような音を生成します。Karplus-Strong方式のプラックシンセシスを使用しています。",
+    "template": "s.waitForBoot({\n    {\n        // Karplus-Strong風のプラックシンセシス\n        var exciter = WhiteNoise.ar({amp});\n        var delayTime = 1 / {freq};\n        var decayTime = {duration};\n        \n        // エンベロープ適用\n        exciter = exciter * EnvGen.kr(Env.perc({attack}, {exciter_decay}));\n        \n        // フィードバックディレイラインでプラック効果を作成\n        var sig = CombL.ar(\n            exciter,\n            delayTime * 2,\n            delayTime,\n            decayTime,\n            1\n        );\n        \n        // ローパスフィルターで音色調整\n        sig = LPF.ar(sig, {freq} * {filter_mult});\n        \n        // 全体的なエンベロープ\n        sig = sig * EnvGen.kr(Env.linen({attack}, decayTime, {release}), doneAction: 2);\n        \n        sig ! 2 // ステレオ出力\n    }.play;\n});"
+  },
+  "generate_percussion": {
+    "description": "打楽器的な音を生成します。短いエクサイターと共鳴体のモデルを使用しています。",
+    "template": "s.waitForBoot({\n    {\n        // 打楽器的な音を生成\n        var sig, exciter, body;\n        \n        // エクサイター部分（短いノイズバースト）\n        exciter = WhiteNoise.ar({amp}) * EnvGen.kr(Env.perc({attack}, {exciter_decay}));\n        \n        // ボディ共鳴部分\n        body = Ringz.ar(\n            exciter,\n            [{freq} * 1, {freq} * {ring_freq1}, {freq} * {ring_freq2}],\n            [{ring_time1}, {ring_time2}, {ring_time3}]\n        ).sum;\n        \n        // ハイパスフィルターで低域をカット\n        sig = HPF.ar(body, {hpf_freq});\n        \n        // 全体的なエンベロープ\n        sig = sig * EnvGen.kr(Env.perc({attack}, {duration}), doneAction: 2);\n        \n        sig ! 2 // ステレオ出力\n    }.play;\n});"
+  }
+}
