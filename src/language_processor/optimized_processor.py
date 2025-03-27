@@ -9,13 +9,19 @@ SPACO - 最適化された言語処理モジュール
 """
 
 import logging
-from typing import Dict, Any, Optional, List, Union
+import time
+from typing import Dict, Any, Optional, List, Union, Tuple
 
 from .representation.optimized_converter import OptimizedConversionPipeline
 from .representation.intent_level import IntentLevel, IntentType
 from .representation.parameter_level import ParameterLevel
 from .representation.structure_level import StructureLevel
-from .representation.code_level import CodeLevel
+from .representation.code_level import CodeLevel, CodeType
+
+# プリコンパイルパターン関連のインポート
+from .synthesis.precompiled_patterns import pattern_manager
+from .synthesis.pattern_catalog import pattern_catalog
+from .synthesis.optimized_synthesizer import optimized_synthesizer
 
 logger = logging.getLogger(__name__)
 
@@ -29,13 +35,16 @@ class OptimizedLanguageProcessor:
     使用して、変換パフォーマンスを向上させます。
     """
     
-    def __init__(self, cache_size: int = 256, enable_cache_stats: bool = False):
+    def __init__(self, cache_size: int = 256, enable_cache_stats: bool = False,
+                 use_precompiled_patterns: bool = False, initialize_patterns: bool = False):
         """
         最適化された言語処理クラスを初期化します。
         
         引数:
             cache_size: 各変換器のキャッシュサイズ
             enable_cache_stats: キャッシュの統計情報を収集するかどうか
+            use_precompiled_patterns: プリコンパイルパターンを使用するか
+            initialize_patterns: 起動時にパターンを初期化するか
         """
         self.pipeline = OptimizedConversionPipeline(
             cache_size=cache_size,
@@ -43,6 +52,26 @@ class OptimizedLanguageProcessor:
         )
         self.cache_size = cache_size
         self.enable_cache_stats = enable_cache_stats
+        self.use_precompiled_patterns = use_precompiled_patterns
+        
+        # パフォーマンス計測用メトリクス
+        self.performance_metrics = {
+            "total_calls": 0,
+            "total_processing_time": 0.0,
+            "pattern_route_count": 0,
+            "pipeline_route_count": 0,
+            "pattern_match_success": 0,
+            "pattern_match_failure": 0
+        }
+        
+        # プリコンパイルパターンの初期化
+        if use_precompiled_patterns and initialize_patterns:
+            try:
+                pattern_catalog.initialize()
+                logger.info("音響パターンカタログが初期化されました")
+            except Exception as e:
+                logger.error(f"音響パターンカタログの初期化中にエラーが発生しました: {str(e)}", exc_info=True)
+                # エラーが発生しても処理は続行
     
     def process(self, instruction: str) -> Dict[str, Any]:
         """
@@ -54,12 +83,36 @@ class OptimizedLanguageProcessor:
         戻り値:
             Dict[str, Any]: 処理結果（コード、メタデータなど）
         """
+        start_time = time.time()
+        self.performance_metrics["total_calls"] += 1
+        
         try:
             # 指示から意図を抽出
             intent = self._extract_intent(instruction)
             
-            # 意図からコードを生成
-            code_level = self.pipeline.convert_intent_to_code(intent)
+            # プリコンパイルパターンを使用するか判断
+            use_patterns = False
+            if self.use_precompiled_patterns:
+                # パターンルートが適用可能かチェック
+                if intent.intent_type in [IntentType.GENERATE_SOUND, IntentType.APPLY_EFFECT]:
+                    use_patterns = True
+            
+            if use_patterns:
+                # プリコンパイルパターンを使用した高速ルート
+                try:
+                    code_level = optimized_synthesizer.synthesize_from_intent(intent)
+                    self.performance_metrics["pattern_route_count"] += 1
+                    self.performance_metrics["pattern_match_success"] += 1
+                except Exception as e:
+                    # パターンルートが失敗した場合、通常のパイプラインにフォールバック
+                    logger.warning(f"パターンルートが失敗しました: {str(e)}", exc_info=True)
+                    code_level = self.pipeline.convert_intent_to_code(intent)
+                    self.performance_metrics["pipeline_route_count"] += 1
+                    self.performance_metrics["pattern_match_failure"] += 1
+            else:
+                # 通常の変換パイプライン
+                code_level = self.pipeline.convert_intent_to_code(intent)
+                self.performance_metrics["pipeline_route_count"] += 1
             
             # SuperColliderコードを生成
             sc_code = code_level.generate_code()
@@ -70,13 +123,19 @@ class OptimizedLanguageProcessor:
                 "code": sc_code,
                 "metadata": {
                     "intent": intent.to_dict(),
-                    "code_type": code_level.code_type.name
+                    "code_type": code_level.code_type.name,
+                    "processing_route": "pattern" if use_patterns else "pipeline"
                 }
             }
             
             # キャッシュ統計情報を含める（有効な場合）
             if self.enable_cache_stats:
-                result["cache_stats"] = self.pipeline.get_cache_stats()
+                stats = self.get_cache_stats()
+                result["cache_stats"] = stats
+            
+            # パフォーマンスメトリクスを更新
+            end_time = time.time()
+            self.performance_metrics["total_processing_time"] += (end_time - start_time)
             
             return result
         except Exception as e:
@@ -161,8 +220,25 @@ class OptimizedLanguageProcessor:
         """
         if not self.enable_cache_stats:
             return {"enabled": False}
-            
-        return self.pipeline.get_cache_stats()
+        
+        stats = {"pipeline": self.pipeline.get_cache_stats()}
+        
+        if self.use_precompiled_patterns:
+            stats["synthesizer"] = optimized_synthesizer.get_performance_metrics()
+            stats["pattern_catalog"] = pattern_catalog.get_stats()
+        
+        # パフォーマンスメトリクスを追加
+        metrics = self.performance_metrics.copy()
+        if metrics["total_calls"] > 0:
+            metrics["avg_processing_time"] = (
+                metrics["total_processing_time"] / metrics["total_calls"]
+            )
+        else:
+            metrics["avg_processing_time"] = 0.0
+        
+        stats["performance"] = metrics
+        
+        return stats
     
     def clear_cache(self) -> None:
         """
@@ -173,12 +249,85 @@ class OptimizedLanguageProcessor:
         self.pipeline.param_to_structure._convert_impl.cache_clear()
         self.pipeline.structure_to_code._convert_impl.cache_clear()
         
+        # 合成エンジンのキャッシュもクリア
+        if self.use_precompiled_patterns:
+            optimized_synthesizer.clear_caches()
+        
         logger.info("すべての変換キャッシュがクリアされました")
+    
+    def get_performance_report(self) -> Dict[str, Any]:
+        """
+        詳細なパフォーマンスレポートを生成します。
+        
+        戻り値:
+            Dict[str, Any]: パフォーマンスレポート
+        """
+        # 基本的なパフォーマンスメトリクス
+        metrics = self.performance_metrics.copy()
+        
+        # 平均処理時間を計算
+        if metrics["total_calls"] > 0:
+            metrics["avg_processing_time"] = (
+                metrics["total_processing_time"] / metrics["total_calls"]
+            )
+        else:
+            metrics["avg_processing_time"] = 0.0
+        
+        # ルートの割合を計算
+        if metrics["total_calls"] > 0:
+            metrics["pattern_route_percentage"] = (
+                metrics["pattern_route_count"] / metrics["total_calls"] * 100
+            )
+            metrics["pipeline_route_percentage"] = (
+                metrics["pipeline_route_count"] / metrics["total_calls"] * 100
+            )
+        else:
+            metrics["pattern_route_percentage"] = 0.0
+            metrics["pipeline_route_percentage"] = 0.0
+        
+        # パイプラインとシンセサイザーの統計情報
+        report = {
+            "performance_metrics": metrics,
+            "pipeline_stats": self.pipeline.get_cache_stats() if self.enable_cache_stats else {},
+        }
+        
+        if self.use_precompiled_patterns:
+            # シンセサイザーの統計情報
+            synth_metrics = optimized_synthesizer.get_performance_metrics()
+            
+            # 合成ルート使用時の平均速度向上
+            if (synth_metrics["total_synthesis_calls"] > 0 and
+                metrics["pipeline_route_count"] > 0):
+                
+                # パイプラインルートの平均時間を推定
+                avg_pipeline_time = (
+                    metrics["total_processing_time"] - synth_metrics["total_synthesis_time"]
+                ) / metrics["pipeline_route_count"]
+                
+                # パターンルートの平均時間
+                avg_pattern_time = (
+                    synth_metrics["total_synthesis_time"] / synth_metrics["total_synthesis_calls"]
+                )
+                
+                # 速度向上率を計算（パイプラインに対するパターンの速度）
+                if avg_pattern_time > 0:
+                    speedup = avg_pipeline_time / avg_pattern_time
+                else:
+                    speedup = float('inf')  # ゼロ除算を避ける
+                
+                synth_metrics["speedup_vs_pipeline"] = speedup
+            
+            report["synthesizer_stats"] = synth_metrics
+            report["pattern_stats"] = pattern_catalog.get_stats()
+        
+        return report
 
 
 # グローバルな最適化プロセッサーインスタンス
 # アプリケーション全体で共有するためのシングルトン
 optimized_processor = OptimizedLanguageProcessor(
     cache_size=256,  # デフォルトのキャッシュサイズ
-    enable_cache_stats=True  # 統計情報を有効化
+    enable_cache_stats=True,  # 統計情報を有効化
+    use_precompiled_patterns=True,  # プリコンパイルパターンを使用
+    initialize_patterns=True  # 起動時にパターンを初期化
 )
