@@ -14,20 +14,77 @@ import time
 import os
 import json
 import hashlib
+import weakref
 from typing import Dict, Any, List, Optional, Set, Union, Tuple, Callable
 import sqlite3
 import threading
 from functools import lru_cache
+from contextlib import contextmanager
 
 # データベース関連のインポート
-from src.data.db.connection import get_connection, transaction
+from src.data.db.connection import DatabaseManager
 from src.data.utils.exceptions import ValidationError, DatabaseError
 from src.data.utils.i18n import t
+
+# アダプティブキャッシュマネージャーをインポート
+from .adaptive_cache_manager import get_cache_manager
 
 logger = logging.getLogger(__name__)
 
 # スレッドローカルストレージ
 _thread_local = threading.local()
+
+# シングルトンインスタンスのロック
+_singleton_lock = threading.RLock()
+
+# データベースマネージャーのインスタンス
+_db_manager = DatabaseManager.get_instance()
+
+@contextmanager
+def get_connection() -> sqlite3.Connection:
+    """
+    データベース接続を取得するコンテキストマネージャー
+    
+    利用例:
+    ```python
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM some_table")
+    ```
+    """
+    # データベース接続を取得
+    conn = _db_manager.connect()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+@contextmanager
+def transaction():
+    """
+    トランザクションを使用するコンテキストマネージャー
+    
+    利用例:
+    ```python
+    @transaction()
+    def some_function():
+        conn = getattr(_thread_local, 'conn', None)
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO ...") 
+    ```
+    """
+    conn = _db_manager.connect()
+    _thread_local.conn = conn
+    try:
+        yield
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        _thread_local.conn = None
+        conn.close()
 
 
 class PatternCompilationError(Exception):
@@ -207,16 +264,55 @@ class PatternCompiler:
         
         # 簡易的な定数演算の事前計算（シンプルな掛け算や足し算など）
         import re
-        # 数値演算のパターン（例: 2 * 3, 4 + 5）
-        const_ops = re.findall(r'(\d+\s*[\*\+\-\/]\s*\d+)', code)
-        for op in const_ops:
+        import operator
+        
+        # 演算子と対応する関数のマッピング
+        op_funcs = {
+            '+': operator.add,
+            '-': operator.sub,
+            '*': operator.mul,
+            '/': operator.truediv
+        }
+        
+        # 数値演算のパターン（例: 2 * 3, 4 + 5）の拡張正規表現
+        # 少数も含めて正確にキャプチャするよう改善
+        const_ops = re.findall(r'(\d+(?:\.\d+)?\s*([\*\+\-\/])\s*\d+(?:\.\d+)?)', code)
+        
+        for full_op, op_symbol in const_ops:
             try:
-                # 安全に評価（数値演算のみを許可）
-                result = eval(op.replace("*", "*").replace("+", "+").replace("-", "-").replace("/", "/"))
-                code = code.replace(op, str(result))
-            except:
+                # 数値と演算子を安全に抽出
+                operands = re.split(r'\s*[\*\+\-\/]\s*', full_op)
+                if len(operands) != 2:
+                    continue
+                    
+                # 数値に変換
+                try:
+                    left = float(operands[0])
+                    right = float(operands[1])
+                except ValueError:
+                    continue
+                
+                # 整数値かどうかを確認し、適切な型に変換
+                if left.is_integer():
+                    left = int(left)
+                if right.is_integer():
+                    right = int(right)
+                
+                # 対応する演算を実行
+                if op_symbol in op_funcs:
+                    # ゼロ除算を防止
+                    if op_symbol == '/' and right == 0:
+                        continue
+                        
+                    result = op_funcs[op_symbol](left, right)
+                    
+                    # 結果を文字列に変換して置換
+                    result_str = str(int(result) if isinstance(result, float) and result.is_integer() else result)
+                    code = code.replace(full_op, result_str)
+            except Exception as e:
                 # 評価に失敗した場合は置換しない
-                pass
+                logger.debug(f"定数演算の評価に失敗しました: {full_op}, エラー: {str(e)}")
+                continue
         
         return code
     
@@ -256,6 +352,22 @@ class PatternManager:
         """
         self.compiler = PatternCompiler()
         self.cache_size = cache_size
+        
+        # アダプティブキャッシュマネージャーに登録
+        self.cache_manager = get_cache_manager()
+        # 自身の弱参照を作成してメモリリークを防止
+        self_weak = weakref.ref(self)
+        def cache_clear_callback():
+            self_ref = self_weak()
+            if self_ref:
+                self_ref._clear_caches()
+        
+        self.cache_manager.register_cache_clear_callback(cache_clear_callback)
+        
+        # メモリ使用量の監視を開始
+        self.cache_manager.start_monitoring()
+        
+        # データベースの初期化
         self._init_db()
     
     def _init_db(self):
@@ -276,7 +388,9 @@ class PatternManager:
                     metadata TEXT,
                     compilation_time REAL,
                     created_at REAL NOT NULL,
-                    last_used_at REAL
+                    last_used_at REAL,
+                    -- 同名パターンの重複を防止するための複合一意性制約
+                    UNIQUE(name, pattern_type)
                 );
                 """)
                 
@@ -301,7 +415,7 @@ class PatternManager:
                 original_exception=e
             )
     
-    @lru_cache(maxsize=100)
+    @lru_cache(maxsize=None)  # 動的に管理されるのでサイズ制限を解除
     def get_pattern(self, pattern_id: str) -> Optional[PrecompiledPattern]:
         """
         パターンIDに基づいてプリコンパイルされたパターンを取得します。
@@ -380,7 +494,8 @@ class PatternManager:
                     params.append(pattern_type)
                 
                 # 最も最近使用されたパターンを取得
-                query += " ORDER BY last_used_at DESC NULLS LAST LIMIT 1"
+                # SQLite互換のNULLS LASTクエリを使用
+                query += " ORDER BY last_used_at IS NULL, last_used_at DESC LIMIT 1"
                 
                 cursor.execute(query, params)
                 row = cursor.fetchone()
@@ -409,21 +524,52 @@ class PatternManager:
         try:
             with get_connection() as conn:
                 cursor = conn.cursor()
+                # N+1クエリ問題を解決するため、必要なデータを一度に取得
                 cursor.execute("""
-                SELECT pattern_id
+                SELECT name, pattern_type, source_code, compiled_code, metadata, 
+                       compilation_time, pattern_id
                 FROM precompiled_patterns
                 WHERE pattern_type = ?
-                ORDER BY last_used_at DESC NULLS LAST
+                ORDER BY last_used_at IS NULL, last_used_at DESC
+                LIMIT 100  -- 安全のための上限を設定
                 """, (pattern_type,))
                 
                 rows = cursor.fetchall()
                 patterns = []
+                pattern_ids = []
                 
                 for row in rows:
-                    pattern_id = row[0]
-                    pattern = self.get_pattern(pattern_id)
-                    if pattern:
-                        patterns.append(pattern)
+                    name, p_type, source_code, compiled_code, metadata_json, compilation_time, pattern_id = row
+                    # キャッシュを更新するためにpattern_idを記録
+                    pattern_ids.append(pattern_id)
+                    
+                    # JSONメタデータをロード
+                    metadata = json.loads(metadata_json) if metadata_json else {}
+                    
+                    # パターンオブジェクトを構築
+                    pattern = PrecompiledPattern(
+                        name=name,
+                        pattern_type=p_type,
+                        source_code=source_code,
+                        compiled_code=compiled_code,
+                        metadata=metadata
+                    )
+                    if compilation_time:
+                        pattern.compilation_time = compilation_time
+                    
+                    patterns.append(pattern)
+                
+                # 一括で最終使用時間を更新
+                if pattern_ids:
+                    now = time.time()
+                    update_query = """
+                    UPDATE precompiled_patterns
+                    SET last_used_at = ?
+                    WHERE pattern_id IN ({})
+                    """.format(", ".join(["?" for _ in pattern_ids]))
+                    
+                    cursor.execute(update_query, [now] + pattern_ids)
+                    conn.commit()
                 
                 return patterns
                 
@@ -443,11 +589,13 @@ class PatternManager:
             bool: 保存に成功したかどうか
         """
         try:
-            conn = getattr(_thread_local, 'conn', None)
-            if not conn:
-                raise DatabaseError(message=t("トランザクションコンテキストがありません"))
-                
-            cursor = conn.cursor()
+            # スレッドセーフな操作のためロックを取得
+            with _singleton_lock:
+                conn = getattr(_thread_local, 'conn', None)
+                if not conn:
+                    raise DatabaseError(message=t("トランザクションコンテキストがありません"))
+                    
+                cursor = conn.cursor()
             
             # 既存のパターンを確認
             cursor.execute("""
@@ -589,6 +737,15 @@ class PatternManager:
             logger.error(f"未使用パターン削除中にエラーが発生しました: {str(e)}", exc_info=True)
             return 0
     
+    def _clear_caches(self) -> None:
+        """すべてのキャッシュをクリアする内部メソッド"""
+        try:
+            # 取得キャッシュをクリア
+            self.get_pattern.cache_clear()
+            logger.info("パターンマネージャーのキャッシュがクリアされました")
+        except Exception as e:
+            logger.error(f"キャッシュクリア中にエラーが発生しました: {str(e)}", exc_info=True)
+    
     def get_pattern_stats(self) -> Dict[str, Any]:
         """
         パターン関連の統計情報を取得します。
@@ -621,11 +778,15 @@ class PatternManager:
                     "current_size": cache_info.currsize
                 }
                 
+                # キャッシュマネージャーの統計情報を取得
+                memory_stats = self.cache_manager.get_stats()
+                
                 return {
                     "total_patterns": total_patterns,
                     "type_counts": type_counts,
                     "cache_stats": cache_stats,
-                    "compiler_stats": self.compiler.get_compilation_stats()
+                    "compiler_stats": self.compiler.get_compilation_stats(),
+                    "memory_management": memory_stats
                 }
                 
         except Exception as e:
@@ -635,9 +796,35 @@ class PatternManager:
                 "total_patterns": 0,
                 "type_counts": {},
                 "cache_stats": {},
-                "compiler_stats": {}
+                "compiler_stats": {},
+                "memory_management": {
+                    "error": "Failed to retrieve memory stats"
+                }
             }
 
 
 # シングルトンインスタンス
-pattern_manager = PatternManager(cache_size=100)
+_pattern_manager_instance = None
+
+def get_pattern_manager(cache_size: int = 100) -> PatternManager:
+    """
+    スレッドセーフなシングルトンパターンによりPatternManagerのインスタンスを取得します。
+    
+    引数:
+        cache_size: メモリ内キャッシュのサイズ
+        
+    戻り値:
+        PatternManager: シングルトンインスタンス
+    """
+    global _pattern_manager_instance
+    
+    # ダブルチェックロッキングパターンを使用
+    if _pattern_manager_instance is None:
+        with _singleton_lock:
+            if _pattern_manager_instance is None:
+                _pattern_manager_instance = PatternManager(cache_size=cache_size)
+                
+    return _pattern_manager_instance
+
+# 下位互換性のためのエイリアス
+pattern_manager = get_pattern_manager()

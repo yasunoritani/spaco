@@ -1,0 +1,25 @@
+# SPACO Python Dependencies
+# パフォーマンス最適化関連
+psutil>=5.9.0
+numpy>=1.21.0
+sqlalchemy>=1.4.0
+
+# データベース関連
+sqlite3>=2.6.0
+
+# OSC通信 (SuperCollider連携)
+python-osc>=1.8.0
+
+# 並列処理・非同期処理
+asyncio>=3.4.3
+threading>=2.0.0
+
+# 数学・統計
+math>=0.0.1
+statistics>=1.0.3
+sympy>=1.8.0  # 安全な数式評価用
+
+# ユーティリティ
+json>=2.0.9
+logging>=0.5.1
+hashlib>=20081119
